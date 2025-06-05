@@ -1,0 +1,67 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model AuthKey {
+  id        String    @id @default(cuid())
+  key       String    @unique
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@index([key])
+  @@map("auth_keys")
+}
+
+model User {
+  id    String @id @default(cuid())
+  email String @unique
+
+  @@map("users")
+}
+
+model UserProvisionRule {
+  id          String   @id @default(cuid())
+  ruleType    String   @map("rule_type")
+  ruleOptions Json     @map("rule_options")
+  createdAt   DateTime @default(now())
+
+  @@index([ruleType])
+  @@map("user_provision_rules")
+}
+
+model Upstream {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  url       String?
+  headers   Json?
+  createdAt DateTime @default(now())
+
+  @@map("upstreams")
+}
+
+model Response {
+  id              String   @id @default(cuid())
+  url             String
+  method          String
+  status          Int      @default(200)
+  requestBody     Bytes?
+  responseBody    Bytes?
+  requestHeaders  Json
+  responseHeaders Json
+  sessionId       String?
+  createdAt       DateTime @default(now())
+
+  @@index([sessionId])
+  @@map("responses")
+}
