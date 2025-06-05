@@ -41,7 +41,7 @@ export const authOptions: NextAuthOptions = {
       // If user doesn't exist, check provision rules
       if (!existingUser) {
         // Extract domain from email
-        const emailDomain = user.email.split('@')[1]
+        const emailDomain = user.email.split('@')[1].toLowerCase()
         if (!emailDomain) return false
 
         // Look for domain provision rule
@@ -53,7 +53,7 @@ export const authOptions: NextAuthOptions = {
         //TODO - use query instead of fetching all rules and filtering in memory
         const matchingRule = provisionRules.find(rule => {
           const ruleOptions = rule.ruleOptions as { domain?: string }
-          return ruleOptions.domain === `@${emailDomain}`
+          return ruleOptions.domain?.toLowerCase() === `@${emailDomain}`
         })
 
         if (matchingRule) {

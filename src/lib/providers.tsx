@@ -4,6 +4,7 @@ import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {useState} from 'react'
 import {AntdRegistry} from "@ant-design/nextjs-registry";
 import {ConfigProvider} from "antd";
+import {SessionProvider} from "next-auth/react";
 
 export function RootProviders({children}: { children: React.ReactNode }) {
     const [queryClient] = useState(
@@ -19,12 +20,14 @@ export function RootProviders({children}: { children: React.ReactNode }) {
     )
 
     return (
-        <QueryClientProvider client={queryClient}>
-            <AntdRegistry>
-                <ConfigProvider>
-                    {children}
-                </ConfigProvider>
-            </AntdRegistry>
-        </QueryClientProvider>
+        <SessionProvider>
+            <QueryClientProvider client={queryClient}>
+                <AntdRegistry>
+                    <ConfigProvider>
+                        {children}
+                    </ConfigProvider>
+                </AntdRegistry>
+            </QueryClientProvider>
+        </SessionProvider>
     )
 }
