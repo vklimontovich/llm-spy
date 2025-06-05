@@ -1,0 +1,29 @@
+# Dependencies
+node_modules/
+
+# Build outputs
+.next/
+dist/
+build/
+
+# Environment files
+.env*
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+
+# Generated files
+package-lock.json
+yarn.lock
+.DS_Store
+
+# Prisma
+prisma/migrations/
+
+# IDE
+.vscode/
+.idea/
