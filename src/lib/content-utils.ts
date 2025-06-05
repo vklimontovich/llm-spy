@@ -300,6 +300,11 @@ export function detectLLMRequest(body: string): boolean {
       return true
     }
     
+    // Check for tools declaration
+    if (parsed.tools && Array.isArray(parsed.tools)) {
+      return true
+    }
+    
     // Check for content array structure
     if (parsed.content && Array.isArray(parsed.content)) {
       return parsed.content.some((item: any) => 
@@ -315,6 +320,22 @@ export function detectLLMRequest(body: string): boolean {
     return false
   } catch {
     return false
+  }
+}
+
+export function extractToolDeclarations(body: string): any[] {
+  if (!body) return []
+  
+  try {
+    const parsed = JSON.parse(body)
+    
+    if (parsed.tools && Array.isArray(parsed.tools)) {
+      return parsed.tools
+    }
+    
+    return []
+  } catch {
+    return []
   }
 }
 

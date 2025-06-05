@@ -3,9 +3,10 @@
 import { useQuery } from '@tanstack/react-query'
 import { Tabs, Typography, Button, Collapse } from 'antd'
 import { RequestResponse } from "@/app/(protected)/requests/page"
-import { isDisplayable, formatJson, detectLLMRequest, extractPrompts, detectLLMResponse, extractResponsePrompts } from '@/lib/content-utils'
+import { isDisplayable, formatJson, detectLLMRequest, extractPrompts, detectLLMResponse, extractResponsePrompts, extractToolDeclarations } from '@/lib/content-utils'
 import HeadersTable from './HeadersTable'
 import PromptView from './PromptView'
+import ToolDeclarationView from './ToolDeclarationView'
 
 const { Text } = Typography
 
@@ -63,6 +64,7 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
     const isLLMResponse = type === 'response' &&  (fetchedData && detectLLMResponse(fetchedData, contentType))
     const prompts = isLLMRequest ? extractPrompts(fetchedData || '') :
                    isLLMResponse ? extractResponsePrompts(fetchedData || '', contentType) : []
+    const toolDeclarations = type === 'request' && isLLMRequest ? extractToolDeclarations(fetchedData || '') : []
 
     const formatDisplayContent = (rawData: string) => {
       if (contentType?.includes('text/event-stream')) {
@@ -94,6 +96,16 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
         )
       }
     ]
+
+    // Add tool declarations section for requests
+    if (type === 'request' && isLLMRequest && toolDeclarations.length > 0) {
+      collapseItems.push({
+        key: 'tools',
+        label: 'Tool Declarations',
+        extra: <Text className="text-xs">{toolDeclarations.length} tool{toolDeclarations.length > 1 ? 's' : ''}</Text>,
+        children: <ToolDeclarationView tools={toolDeclarations} />
+      })
+    }
 
     if ((isLLMRequest || isLLMResponse) && prompts.length > 0) {
       collapseItems.push({
