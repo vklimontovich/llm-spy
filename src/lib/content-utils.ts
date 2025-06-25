@@ -1,3 +1,5 @@
+import { convertProtobufToJson } from './otel-protobuf'
+
 export function isDisplayable(contentType: string | null): boolean {
   if (!contentType) return false
   const displayableTypes = [
@@ -7,7 +9,8 @@ export function isDisplayable(contentType: string | null): boolean {
     'text/html',
     'text/css',
     'text/javascript',
-    'text/event-stream'
+    'text/event-stream',
+    'application/x-protobuf'
   ]
   return displayableTypes.some(type => contentType.startsWith(type))
 }
@@ -15,16 +18,21 @@ export function isDisplayable(contentType: string | null): boolean {
 export function formatJson(input: any): string {
   if (typeof input === 'string') {
     try {
-      return JSON.stringify(JSON.parse(input), null, 2)
+      const parsed = JSON.parse(input)
+      return JSON.stringify(parsed, null, 2)
     } catch {
-      return input // Return as is if parsing fails
+      return input;
     }
-  } else if (typeof input === 'object') {
+  } else if (typeof input === 'object' && input !== null) {
     return JSON.stringify(input, null, 2)
   } else {
     return String(input) // Convert other types to string
   }
 }
+
+// Re-export for backwards compatibility
+export { convertProtobufToJson }
+
 
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0'
@@ -36,11 +44,11 @@ export function formatBytes(bytes: number): string {
 
 export function parseEventStream(data: string): string {
   if (!data) return ''
-  
+
   // Parse Server-Sent Events format
   const events = data.split('\n\n').filter(event => event.trim())
   let result = ''
-  
+
   for (const event of events) {
     const lines = event.split('\n')
     for (const line of lines) {
@@ -59,34 +67,34 @@ export function parseEventStream(data: string): string {
       }
     }
   }
-  
+
   return result || data
 }
 
 export function assembleStreamingResponse(data: string): PromptItem[] {
   if (!data) return []
-  
+
   try {
     // Parse Server-Sent Events format
     const events = data.split('\n\n').filter(event => event.trim())
     const messages: { [key: string]: { role: string; content: string; model?: string } } = {}
     const contentBlocks: { [messageId: string]: { [index: number]: { type: string; content: string; toolName?: string } } } = {}
-    
+
     for (const event of events) {
       const lines = event.split('\n')
       let eventData = ''
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           eventData = line.substring(6)
         }
       }
-      
+
       if (!eventData) continue
-      
+
       try {
         const parsed = JSON.parse(eventData)
-        
+
         switch (parsed.type) {
           case 'message_start':
             if (parsed.message) {
@@ -99,7 +107,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
               contentBlocks[messageId] = {}
             }
             break
-            
+
           case 'content_block_start':
             if (parsed.content_block) {
               const messageId = Object.keys(messages)[0]
@@ -113,7 +121,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
               }
             }
             break
-            
+
           case 'content_block_delta':
             const messageId = Object.keys(messages)[0]
             if (messageId) {
@@ -121,7 +129,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
               if (!contentBlocks[messageId][index]) {
                 contentBlocks[messageId][index] = { type: 'unknown', content: '' }
               }
-              
+
               if (parsed.delta && parsed.delta.type === 'text_delta') {
                 contentBlocks[messageId][index].content += parsed.delta.text
               } else if (parsed.delta && parsed.delta.type === 'input_json_delta') {
@@ -129,11 +137,11 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
               }
             }
             break
-            
+
           case 'content_block_stop':
             // Content block is complete
             break
-            
+
           case 'message_stop':
             // Message is complete
             break
@@ -142,15 +150,15 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
         // Skip invalid JSON
       }
     }
-    
+
     // Assemble final messages
     const result: PromptItem[] = []
-    
+
     for (const [messageId, message] of Object.entries(messages)) {
       // Combine all content blocks for this message
       const blocks = contentBlocks[messageId] || {}
       const sortedIndexes = Object.keys(blocks).map(Number).sort()
-      
+
       if (sortedIndexes.length === 0) {
         // No content blocks, use message content if available
         if (message.content) {
@@ -166,7 +174,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
           if (block.content) {
             let content = block.content
             let role = message.model ? `${message.role} (${message.model})` : message.role
-            
+
             // Format tool use content
             if (block.type === 'tool_use' && block.toolName) {
               role += ` - ${block.toolName} Tool`
@@ -178,7 +186,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
                 // Keep as is if not valid JSON
               }
             }
-            
+
             result.push({
               role,
               content
@@ -187,7 +195,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
         }
       }
     }
-    
+
     return result
   } catch {
     return []
@@ -196,34 +204,34 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
 
 export function detectLLMResponse(body: string, contentType: string | null): boolean {
   if (!body) return false
-  
+
   // Ensure body is a string
   const bodyStr = typeof body === 'string' ? body : String(body)
-  
+
   // Check for streaming format
   if (contentType?.includes('text/event-stream')) {
     return bodyStr.includes('message_start') || bodyStr.includes('content_block_delta')
   }
-  
+
   // Check for regular JSON response
   try {
     const parsed = JSON.parse(bodyStr)
-    
+
     // Check for OpenAI/Anthropic response format
     if (parsed.choices && Array.isArray(parsed.choices)) {
       return true
     }
-    
+
     // Check for Anthropic response format
     if (parsed.content && Array.isArray(parsed.content)) {
       return true
     }
-    
+
     // Check for message format
     if (parsed.role && parsed.content) {
       return true
     }
-    
+
     return false
   } catch {
     return false
@@ -232,20 +240,20 @@ export function detectLLMResponse(body: string, contentType: string | null): boo
 
 export function extractResponsePrompts(body: string, contentType: string | null): PromptItem[] {
   if (!body) return []
-  
+
   // Ensure body is a string
   const bodyStr = typeof body === 'string' ? body : String(body)
-  
+
   // Handle streaming format
   if (contentType?.includes('text/event-stream')) {
     return assembleStreamingResponse(bodyStr)
   }
-  
+
   // Handle regular JSON response
   try {
     const parsed = JSON.parse(bodyStr)
     const prompts: PromptItem[] = []
-    
+
     // Extract from OpenAI choices format
     if (parsed.choices && Array.isArray(parsed.choices)) {
       for (const choice of parsed.choices) {
@@ -257,7 +265,7 @@ export function extractResponsePrompts(body: string, contentType: string | null)
         }
       }
     }
-    
+
     // Extract from Anthropic content format
     if (parsed.content && Array.isArray(parsed.content)) {
       for (const content of parsed.content) {
@@ -269,7 +277,7 @@ export function extractResponsePrompts(body: string, contentType: string | null)
         }
       }
     }
-    
+
     // Extract from direct message format
     if (parsed.role && parsed.content) {
       prompts.push({
@@ -277,7 +285,7 @@ export function extractResponsePrompts(body: string, contentType: string | null)
         content: typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content)
       })
     }
-    
+
     return prompts
   } catch {
     return []
@@ -286,37 +294,37 @@ export function extractResponsePrompts(body: string, contentType: string | null)
 
 export function detectLLMRequest(body: string): boolean {
   if (!body) return false
-  
+
   try {
     const parsed = JSON.parse(body)
-    
+
     // Check for OpenAI/Anthropic-style messages
     if (parsed.messages && Array.isArray(parsed.messages)) {
       return true
     }
-    
+
     // Check for system prompts
     if (parsed.system) {
       return true
     }
-    
+
     // Check for tools declaration
     if (parsed.tools && Array.isArray(parsed.tools)) {
       return true
     }
-    
+
     // Check for content array structure
     if (parsed.content && Array.isArray(parsed.content)) {
-      return parsed.content.some((item: any) => 
+      return parsed.content.some((item: any) =>
         item.type === 'text' || item.type === 'image'
       )
     }
-    
+
     // Check for prompt field
     if (typeof parsed.prompt === 'string') {
       return true
     }
-    
+
     return false
   } catch {
     return false
@@ -325,14 +333,14 @@ export function detectLLMRequest(body: string): boolean {
 
 export function extractToolDeclarations(body: string): any[] {
   if (!body) return []
-  
+
   try {
     const parsed = JSON.parse(body)
-    
+
     if (parsed.tools && Array.isArray(parsed.tools)) {
       return parsed.tools
     }
-    
+
     return []
   } catch {
     return []
@@ -349,11 +357,11 @@ export interface PromptItem {
 
 export function extractPrompts(body: string): PromptItem[] {
   if (!body) return []
-  
+
   try {
     const parsed = JSON.parse(body)
     const prompts: PromptItem[] = []
-    
+
     // Extract system prompts first
     if (parsed.system) {
       if (typeof parsed.system === 'string') {
@@ -372,7 +380,7 @@ export function extractPrompts(body: string): PromptItem[] {
         }
       }
     }
-    
+
     // Extract from messages array
     if (parsed.messages && Array.isArray(parsed.messages)) {
       for (const message of parsed.messages) {
@@ -405,7 +413,7 @@ export function extractPrompts(body: string): PromptItem[] {
               })
             }
           }
-          
+
           if (contentItems.length > 0) {
             prompts.push({
               role: message.role || 'unknown',
@@ -416,7 +424,7 @@ export function extractPrompts(body: string): PromptItem[] {
         }
       }
     }
-    
+
     // Extract from content array
     if (parsed.content && Array.isArray(parsed.content)) {
       const contentItems: any[] = []
@@ -435,7 +443,7 @@ export function extractPrompts(body: string): PromptItem[] {
           })
         }
       }
-      
+
       if (contentItems.length > 0) {
         prompts.push({
           role: parsed.role || 'assistant',
@@ -444,7 +452,7 @@ export function extractPrompts(body: string): PromptItem[] {
         })
       }
     }
-    
+
     // Extract from prompt field
     if (typeof parsed.prompt === 'string') {
       prompts.push({
@@ -452,7 +460,7 @@ export function extractPrompts(body: string): PromptItem[] {
         content: parsed.prompt
       })
     }
-    
+
     return prompts
   } catch {
     return []

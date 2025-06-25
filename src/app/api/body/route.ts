@@ -1,6 +1,7 @@
 import {NextRequest, NextResponse} from 'next/server'
 import {prisma} from '@/lib/prisma'
 import {requireAuth} from '@/lib/auth'
+import {convertProtobufToJson} from '@/lib/content-utils'
 const getFileExtension = (contentType: string): string => {
     const mimeToExt: Record<string, string> = {
         'application/json': 'json',
@@ -47,6 +48,7 @@ export async function GET(request: NextRequest) {
         const id = searchParams.get('id')
         const type = searchParams.get('type')
         const download = searchParams.get('download') === 'true'
+        const format = searchParams.get('format')
 
         if (!id || !type || !['request', 'response'].includes(type)) {
             return NextResponse.json(
@@ -73,7 +75,34 @@ export async function GET(request: NextRequest) {
             ? (headers as Record<string, string>)['content-type'] || ''
             : ''
 
+        // Handle OTEL JSON format conversion
+        if (format === 'otel-json' && body) {
+            try {
+                const contentEncoding = headers && typeof headers === 'object'
+                    ? (headers as Record<string, string>)['content-encoding']
+                    : undefined
 
+                // Handle Uint8Array from Prisma
+                const uint8Array = body instanceof Uint8Array ? body : new Uint8Array(Buffer.from(body, 'binary'))
+                const arrayBuffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength) as ArrayBuffer
+                const otelJson = await convertProtobufToJson(arrayBuffer, contentEncoding)
+                
+                return new NextResponse(otelJson, {
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Content-Length': Buffer.byteLength(otelJson, 'utf8').toString()
+                    }
+                })
+            } catch (error) {
+                return NextResponse.json(
+                    {
+                        error: 'Failed to convert protobuf to OTEL JSON',
+                        details: error instanceof Error ? error.message : 'Unknown error'
+                    },
+                    {status: 500}
+                )
+            }
+        }
 
         // If download is requested, return file
         if (download && body) {

@@ -1,8 +1,9 @@
 'use client'
 
-import { Typography, Tag, Collapse } from 'antd'
-import { formatJson } from '@/lib/content-utils'
+import { Typography, Collapse } from 'antd'
 import { ToolOutlined, CodeOutlined, FileTextOutlined } from '@ant-design/icons'
+import JsonView from './JsonView'
+import styles from './ToolDeclarationView.module.css'
 
 const { Text } = Typography
 
@@ -18,19 +19,35 @@ interface Tool {
   name: string
   description: string
   input_schema?: ToolSchema
+  parameters?: string | any  // Can be JSON string or object
 }
 
 interface ToolDeclarationViewProps {
   tools: Tool[]
 }
 
-const formatSchema = (schema: ToolSchema | undefined) => {
-  if (!schema) return null
+const getParametersObject = (tool: Tool): any => {
+  // Try to get parameters from different possible locations
+  if (tool.input_schema) {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const { $schema, ...schemaWithoutMeta } = tool.input_schema
+    return schemaWithoutMeta
+  }
   
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const { $schema, ...schemaWithoutMeta } = schema
-  return formatJson(schemaWithoutMeta)
+  if (tool.parameters) {
+    if (typeof tool.parameters === 'string') {
+      try {
+        return JSON.parse(tool.parameters)
+      } catch {
+        return null
+      }
+    }
+    return tool.parameters
+  }
+  
+  return null
 }
+
 
 export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps) {
   if (!tools || tools.length === 0) {
@@ -54,30 +71,21 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
           </div>
         </div>
         
-        {tool.input_schema && (
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <CodeOutlined className="text-green-500" />
-              <Text strong className="text-sm">Input Schema:</Text>
-            </div>
-            <div className="p-3 bg-gray-900 rounded">
-              <pre className="text-xs text-green-400 font-mono overflow-auto max-h-64">
-                {formatSchema(tool.input_schema)}
-              </pre>
-            </div>
-            
-            {tool.input_schema.required && tool.input_schema.required.length > 0 && (
-              <div className="mt-2">
-                <Text className="text-xs text-gray-600">Required parameters: </Text>
-                {tool.input_schema.required.map((param) => (
-                  <Tag key={param} color="red" className="text-xs ml-1">
-                    {param}
-                  </Tag>
-                ))}
+        {(() => {
+          const paramsObj = getParametersObject(tool)
+          
+          if (!paramsObj) return null
+          
+          return (
+            <div>
+              <div className="flex items-center gap-2 mb-2">
+                <CodeOutlined className="text-green-500" />
+                <Text strong className="text-sm">Parameters:</Text>
               </div>
-            )}
-          </div>
-        )}
+              <JsonView data={paramsObj} simple />
+            </div>
+          )
+        })()}
       </div>
     ),
   }))
@@ -93,16 +101,8 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
       <Collapse 
         items={toolItems} 
         defaultActiveKey={tools.length === 1 ? ['tool-0'] : []}
-        className="tool-declaration-collapse"
+        className={styles.toolDeclarationCollapse}
       />
-      <style jsx global>{`
-        .tool-declaration-collapse .ant-collapse-header {
-          padding: 12px 16px !important;
-        }
-        .tool-declaration-collapse .ant-collapse-content-box {
-          padding: 16px !important;
-        }
-      `}</style>
     </div>
   )
 }

@@ -1,0 +1,7 @@
+.toolDeclarationCollapse :global(.ant-collapse-header) {
+  padding: 12px 16px !important;
+}
+
+.toolDeclarationCollapse :global(.ant-collapse-content-box) {
+  padding: 16px !important;
+}

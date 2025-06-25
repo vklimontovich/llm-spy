@@ -2,8 +2,8 @@
 
 import { Typography, Tag, Divider } from 'antd'
 import { PromptItem } from '@/lib/content-utils'
-import { formatJson } from '@/lib/content-utils'
 import { User, Bot, Settings, Wrench, CheckCircle, MessageSquare, FileText } from 'lucide-react'
+import SmartContentView from './SmartContentView'
 
 const { Text } = Typography
 
@@ -43,26 +43,14 @@ const renderContent = (content: string | any, singleItem?: any) => {
   // If we have a single item from an array, render it directly
   if (singleItem) {
     if (singleItem.type === 'text') {
-      return (
-        <pre className="text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap text-gray-800 leading-relaxed">
-          {singleItem.content}
-        </pre>
-      )
+      return <SmartContentView data={singleItem.content} />
     } else if (singleItem.type === 'tool_use' || singleItem.type === 'tool_result') {
-      return (
-        <pre className="text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap text-gray-800 leading-relaxed">
-          {formatJson(singleItem.content)}
-        </pre>
-      )
+      return <SmartContentView data={singleItem.content} />
     }
   }
 
   if (typeof content === 'string') {
-    return (
-      <pre className="text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap text-gray-800 leading-relaxed">
-        {content}
-      </pre>
-    )
+    return <SmartContentView data={content} />
   }
 
   if (Array.isArray(content)) {
@@ -72,18 +60,14 @@ const renderContent = (content: string | any, singleItem?: any) => {
         {content.map((item, idx) => (
           <div key={idx}>
             {item.type === 'text' && (
-              <pre className="text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap text-gray-800 leading-relaxed">
-                {item.content}
-              </pre>
+              <SmartContentView data={item.content} />
             )}
             {item.type === 'tool_use' && (
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-semibold text-blue-700">Tool: {item.toolName}</span>
                 </div>
-                <pre className="text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap text-gray-700">
-                  {formatJson(item.content)}
-                </pre>
+                <SmartContentView data={item.content} className="text-gray-700" />
               </div>
             )}
             {item.type === 'tool_result' && (
@@ -91,9 +75,7 @@ const renderContent = (content: string | any, singleItem?: any) => {
                 <div className="flex items-center gap-2 mb-2">
                   <span className="text-xs font-semibold text-green-700">Tool Result</span>
                 </div>
-                <pre className="text-xs font-mono overflow-auto max-h-64 whitespace-pre-wrap text-gray-700">
-                  {typeof item.content === 'string' ? item.content : formatJson(item.content)}
-                </pre>
+                <SmartContentView data={item.content} className="text-gray-700" />
               </div>
             )}
             {idx < content.length - 1 && <Divider className="my-2" />}
@@ -104,11 +86,7 @@ const renderContent = (content: string | any, singleItem?: any) => {
   }
 
   // Fallback for other types
-  return (
-    <pre className="text-xs font-mono overflow-auto max-h-96 whitespace-pre-wrap text-gray-800 leading-relaxed">
-      {formatJson(content)}
-    </pre>
-  )
+  return <SmartContentView data={content} />
 }
 
 export default function PromptView({ prompts }: PromptViewProps) {
