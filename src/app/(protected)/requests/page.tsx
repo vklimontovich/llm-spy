@@ -1,13 +1,16 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Table, Drawer, Button, Switch } from 'antd'
+import { Table, Button, Switch } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useMemo, useState, useEffect } from 'react'
+import {  useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
-import RequestResponseTabs from '@/components/RequestResponseTabs'
+import RequestDetails from '@/components/RequestDetails'
 import { extractSessionId } from '@/lib/session-utils'
 import { RefreshCw } from 'lucide-react'
+import styles from './page.module.css'
+
+const PAGE_SIZE = 100
 
 
 export interface RequestResponse {
@@ -21,6 +24,7 @@ export interface RequestResponse {
   requestHeaders: any
   responseHeaders: any
   createdAt: string
+  public?: boolean
 }
 
 export default function RequestsPage() {
@@ -28,6 +32,9 @@ export default function RequestsPage() {
   const [activeTab, setActiveTab] = useState<string>('request')
   const [liveRefresh, setLiveRefresh] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
@@ -38,16 +45,19 @@ export default function RequestsPage() {
     error,
     refetch
   } = useQuery({
-    queryKey: ['requests'],
+    queryKey: ['requests', offset],
     queryFn: async () => {
       const url = new URL('/api/requests', window.location.origin)
-      url.searchParams.set('limit', '100')
+      url.searchParams.set('limit', PAGE_SIZE.toString())
+      url.searchParams.set('offset', offset.toString())
 
       const response = await fetch(url.toString())
       if (!response.ok) {
         throw new Error('Failed to fetch requests')
       }
-      return response.json()
+      const result = await response.json()
+      setHasMore(result.items && result.items.length === PAGE_SIZE)
+      return result
     }
   })
 
@@ -59,13 +69,33 @@ export default function RequestsPage() {
   }, [data])
 
   const handleRefresh = () => {
+    setOffset(0)
+    setAllRequests([])
+    setHasMore(true)
     queryClient.invalidateQueries({ queryKey: ['requests'] })
     refetch()
   }
 
-  const allRequests = useMemo(() => {
-    return data?.items ?? []
-  }, [data])
+  const handleLoadMore = async () => {
+    if (!hasMore || loadingMore) return
+
+    setLoadingMore(true)
+    const newOffset = offset + PAGE_SIZE
+    setOffset(newOffset)
+    setLoadingMore(false)
+  }
+
+  const [allRequests, setAllRequests] = useState<RequestResponse[]>([])
+
+  useEffect(() => {
+    if (data?.items) {
+      if (offset === 0) {
+        setAllRequests(data.items)
+      } else {
+        setAllRequests(prev => [...prev, ...data.items])
+      }
+    }
+  }, [data, offset])
 
   // Handle URL params on mount
   useEffect(() => {
@@ -306,7 +336,7 @@ export default function RequestsPage() {
             pagination={false}
             scroll={{ x: true }}
             size="small"
-            className="compact-table"
+            className={styles.compactTable}
             onRow={(record) => ({
               onClick: () => {
                 setSelectedRequest(record)
@@ -316,41 +346,33 @@ export default function RequestsPage() {
               style: { cursor: 'pointer' }
             })}
           />
-          <style jsx global>{`
-            .compact-table .ant-table-tbody > tr > td {
-              padding: 4px 8px !important;
-              line-height: 1.2 !important;
-            }
-            .compact-table .ant-table-thead > tr > th {
-              padding: 6px 8px !important;
-              font-size: 11px !important;
-              font-weight: 600 !important;
-            }
-            `}</style>
+          {hasMore && (
+            <div className="p-4 text-center border-t">
+              <Button
+                onClick={handleLoadMore}
+                loading={loadingMore || isLoading}
+                size="large"
+              >
+                Load More
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
-      <Drawer
-        title="Request/Response Details"
-        placement="right"
-        width="90%"
-        open={selectedRequest !== null}
+      <RequestDetails
+        selectedRequest={selectedRequest}
+        activeTab={activeTab}
+        onTabChange={(tab) => {
+          setActiveTab(tab)
+          updateUrl(selectedRequest.id, tab)
+        }}
         onClose={() => {
           setSelectedRequest(null)
           updateUrl(null)
         }}
-      >
-        {selectedRequest && (
-          <RequestResponseTabs
-            selectedRequest={selectedRequest}
-            activeTab={activeTab}
-            onTabChange={(tab) => {
-              setActiveTab(tab)
-              updateUrl(selectedRequest.id, tab)
-            }}
-          />
-        )}
-      </Drawer>
+        showShare={true}
+      />
     </div>
   )
 }

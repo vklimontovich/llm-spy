@@ -7,10 +7,17 @@ export async function getSession() {
 
 export async function requireAuth() {
   const session = await getSession()
-  
+
   if (!session?.user?.email) {
+    console.log("Session not found or user email is missing", session)
     throw new Error("Unauthorized")
   }
-  
+
   return session
+}
+
+export async function hasAuth() {
+  const session = await getSession()
+  return !!session?.user?.email
+
 }

@@ -41,7 +41,6 @@ const getFileExtension = (contentType: string): string => {
 }
 
 export async function GET(request: NextRequest) {
-    await requireAuth()
 
     try {
         const {searchParams} = new URL(request.url)
@@ -65,6 +64,9 @@ export async function GET(request: NextRequest) {
                 {status: 404}
             )
         }
+        if (!response.public) {
+            await requireAuth();
+        }
 
         const isRequest = type === 'request'
         const body = isRequest ? response.requestBody : response.responseBody
@@ -86,7 +88,7 @@ export async function GET(request: NextRequest) {
                 const uint8Array = body instanceof Uint8Array ? body : new Uint8Array(Buffer.from(body, 'binary'))
                 const arrayBuffer = uint8Array.buffer.slice(uint8Array.byteOffset, uint8Array.byteOffset + uint8Array.byteLength) as ArrayBuffer
                 const otelJson = await convertProtobufToJson(arrayBuffer, contentEncoding)
-                
+
                 return new NextResponse(otelJson, {
                     headers: {
                         'Content-Type': 'application/json',

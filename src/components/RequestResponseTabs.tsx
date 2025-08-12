@@ -21,6 +21,7 @@ interface RequestResponseTabsProps {
 }
 
 export default function RequestResponseTabs({ selectedRequest, activeTab = 'request', onTabChange }: RequestResponseTabsProps) {
+
   const getContentType = (headers: any, type: 'request' | 'response') => {
     const headerObj = type === 'request' ? selectedRequest.requestHeaders : selectedRequest.responseHeaders;
     return headerObj?.['content-type'] || null;
@@ -114,7 +115,7 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
     let otelPrompts: any[] = []
     let otelToolDeclarations: any[] = []
     let parsedOtelData: any = null
-    
+
     if (isProtobufContent && protobufData) {
       try {
         const parsed = parseOtelTrace(protobufData)
@@ -194,7 +195,7 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
         children: <PromptView prompts={prompts} />
       })
     }
-    
+
     // Add OTEL trace view if applicable
     if (isOtelTrace && otelPrompts.length > 0) {
       collapseItems.push({
@@ -204,7 +205,7 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
         children: <PromptView prompts={otelPrompts} />
       })
     }
-    
+
     // Add OTEL tool declarations if present
     if (isOtelTrace && otelToolDeclarations.length > 0) {
       collapseItems.push({
@@ -214,7 +215,7 @@ export default function RequestResponseTabs({ selectedRequest, activeTab = 'requ
         children: <ToolDeclarationView tools={otelToolDeclarations} />
       })
     }
-    
+
     if (isOtelTrace && parsedOtelData) {
       // Add parsed OTEL data for debugging
       collapseItems.push({

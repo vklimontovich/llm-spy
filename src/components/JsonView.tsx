@@ -5,9 +5,14 @@ import { Segmented, Button, message } from 'antd'
 import { Copy, Check } from 'lucide-react'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
-import ReactJsonView from "@microlink/react-json-view"
 import * as YAML from 'yaml'
+import dynamic from 'next/dynamic'
 import styles from './JsonView.module.css'
+
+const ReactJsonView = dynamic(() => import('@microlink/react-json-view'), {
+  ssr: false,
+  loading: () => <div className="p-3">Loading...</div>
+})
 
 
 interface JsonViewProps {

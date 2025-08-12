@@ -60,8 +60,10 @@ model Response {
   requestHeaders  Json
   responseHeaders Json
   sessionId       String?
+  public          Boolean  @default(false)
   createdAt       DateTime @default(now())
 
   @@index([sessionId])
+  @@index([public])
   @@map("responses")
 }
