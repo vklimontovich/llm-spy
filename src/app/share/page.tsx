@@ -2,14 +2,14 @@
 
 import { useSearchParams, useRouter } from 'next/navigation'
 import { useQuery } from '@tanstack/react-query'
-import { useState, useEffect } from 'react'
+import { useState, useEffect, Suspense } from 'react'
 import { Button, Spin } from 'antd'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { useSession } from 'next-auth/react'
 import RequestResponseTabs from '@/components/RequestResponseTabs'
 import { RequestResponse } from '@/app/(protected)/requests/page'
 
-export default function SharePage() {
+function SharePageContent() {
   const searchParams = useSearchParams()
   const router = useRouter()
   const { data: session } = useSession()
@@ -131,5 +131,20 @@ export default function SharePage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function SharePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-4">
+          <Spin size="large" />
+          <div className="text-lg text-gray-600">Loading...</div>
+        </div>
+      </div>
+    }>
+      <SharePageContent />
+    </Suspense>
   )
 }

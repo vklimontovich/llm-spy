@@ -6,14 +6,15 @@ const prisma = new PrismaClient()
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   await requireAuth()
 
   try {
+    const { id } = await params
     const requestData = await prisma.response.findUnique({
       where: {
-        id: params.id,
+        id,
       },
       select: {
         public: true

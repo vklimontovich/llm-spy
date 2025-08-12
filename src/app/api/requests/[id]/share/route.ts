@@ -4,15 +4,16 @@ import { requireAuth } from '@/lib/auth'
 
 export async function POST(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
     await requireAuth();
 
     const { public: isPublic } = await request.json()
+    const { id } = await params
 
     const updatedResponse = await prisma.response.update({
-      where: { id: (await params).id },
+      where: { id },
       data: { public: isPublic },
       select: { id: true, public: true }
     })

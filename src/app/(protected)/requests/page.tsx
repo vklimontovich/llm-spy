@@ -365,7 +365,7 @@ export default function RequestsPage() {
         activeTab={activeTab}
         onTabChange={(tab) => {
           setActiveTab(tab)
-          updateUrl(selectedRequest.id, tab)
+          updateUrl(selectedRequest!.id, tab)
         }}
         onClose={() => {
           setSelectedRequest(null)
