@@ -29,7 +29,6 @@ export interface RequestResponse {
 
 export default function RequestsPage() {
   const [selectedRequest, setSelectedRequest] = useState<RequestResponse | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('request')
   const [liveRefresh, setLiveRefresh] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [offset, setOffset] = useState(0)
@@ -100,15 +99,11 @@ export default function RequestsPage() {
   // Handle URL params on mount
   useEffect(() => {
     const requestId = searchParams.get('id')
-    const tab = searchParams.get('tab')
 
     if (requestId && allRequests.length > 0) {
       const request = allRequests.find(req => req.id === requestId)
       if (request) {
         setSelectedRequest(request)
-        if (tab) {
-          setActiveTab(tab)
-        }
       }
     }
   }, [searchParams, allRequests])
@@ -340,8 +335,7 @@ export default function RequestsPage() {
             onRow={(record) => ({
               onClick: () => {
                 setSelectedRequest(record)
-                setActiveTab('request')
-                updateUrl(record.id, 'request')
+                updateUrl(record.id, 'chat')
               },
               style: { cursor: 'pointer' }
             })}
@@ -362,11 +356,6 @@ export default function RequestsPage() {
 
       <RequestDetails
         selectedRequest={selectedRequest}
-        activeTab={activeTab}
-        onTabChange={(tab) => {
-          setActiveTab(tab)
-          updateUrl(selectedRequest!.id, tab)
-        }}
         onClose={() => {
           setSelectedRequest(null)
           updateUrl(null)

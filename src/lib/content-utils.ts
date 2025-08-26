@@ -42,34 +42,6 @@ export function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i]
 }
 
-export function parseEventStream(data: string): string {
-  if (!data) return ''
-
-  // Parse Server-Sent Events format
-  const events = data.split('\n\n').filter(event => event.trim())
-  let result = ''
-
-  for (const event of events) {
-    const lines = event.split('\n')
-    for (const line of lines) {
-      if (line.startsWith('data: ')) {
-        const eventData = line.substring(6)
-        if (eventData === '[DONE]') {
-          result += '[STREAM END]\n'
-        } else {
-          try {
-            const parsed = JSON.parse(eventData)
-            result += JSON.stringify(parsed, null, 2) + '\n---\n'
-          } catch {
-            result += eventData + '\n'
-          }
-        }
-      }
-    }
-  }
-
-  return result || data
-}
 
 export function assembleStreamingResponse(data: string): PromptItem[] {
   if (!data) return []

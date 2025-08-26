@@ -2,21 +2,17 @@
 
 import { Drawer } from 'antd'
 import ShareButton from './ShareButton'
-import RequestResponseTabs from './RequestResponseTabs'
+import RequestView from './RequestView'
 import { RequestResponse } from '@/app/(protected)/requests/page'
 
 interface RequestDetailsProps {
   selectedRequest: RequestResponse | null
-  activeTab: string
-  onTabChange: (tab: string) => void
   onClose: () => void
   showShare?: boolean
 }
 
 export default function RequestDetails({
   selectedRequest,
-  activeTab,
-  onTabChange,
   onClose,
   showShare = false
 }: RequestDetailsProps) {
@@ -26,7 +22,6 @@ export default function RequestDetails({
       {showShare && selectedRequest && (
         <ShareButton 
           requestId={selectedRequest.id} 
-          activeTab={activeTab}
         />
       )}
     </div>
@@ -41,11 +36,7 @@ export default function RequestDetails({
       onClose={onClose}
     >
       {selectedRequest && (
-        <RequestResponseTabs
-          selectedRequest={selectedRequest}
-          activeTab={activeTab}
-          onTabChange={onTabChange}
-        />
+        <RequestView selectedRequest={selectedRequest} />
       )}
     </Drawer>
   )

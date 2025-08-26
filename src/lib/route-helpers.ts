@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { ZodError } from 'zod/v4';
 
 type RouteHandler = (request: NextRequest) => Promise<Response | any>;
 
@@ -35,6 +36,14 @@ export function withError(handler: RouteHandler): RouteHandler {
             details: error.cause ? String(error.cause) : undefined,
           },
           { status: error.status },
+        )
+      } else if (error instanceof ZodError) {
+        return NextResponse.json(
+          {
+            error: 'Invalid request - zod error',
+            issues: error.issues,
+          },
+          { status: 400 },
         )
       }
       return NextResponse.json(

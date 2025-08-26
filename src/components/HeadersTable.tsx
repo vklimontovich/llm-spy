@@ -24,7 +24,8 @@ export default function HeadersTable({ headers }: HeadersTableProps) {
       title: 'Header',
       dataIndex: 'name',
       key: 'name',
-      width: '30%'
+      width: '30%',
+      className: 'whitespace-nowrap'
     },
     {
       title: 'Value',

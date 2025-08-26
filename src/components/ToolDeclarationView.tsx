@@ -17,8 +17,9 @@ interface ToolSchema {
 
 interface Tool {
   name: string
-  description: string
+  description?: string
   input_schema?: ToolSchema
+  inputSchema?: ToolSchema | any  // AI SDK uses inputSchema
   parameters?: string | any  // Can be JSON string or object
 }
 
@@ -28,12 +29,22 @@ interface ToolDeclarationViewProps {
 
 const getParametersObject = (tool: Tool): any => {
   // Try to get parameters from different possible locations
+  if (tool.inputSchema) {
+    // AI SDK format
+    if (typeof tool.inputSchema === 'object' && tool.inputSchema.$schema) {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
+      const { $schema, ...schemaWithoutMeta } = tool.inputSchema
+      return schemaWithoutMeta
+    }
+    return tool.inputSchema
+  }
+
   if (tool.input_schema) {
     // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { $schema, ...schemaWithoutMeta } = tool.input_schema
     return schemaWithoutMeta
   }
-  
+
   if (tool.parameters) {
     if (typeof tool.parameters === 'string') {
       try {
@@ -44,7 +55,7 @@ const getParametersObject = (tool: Tool): any => {
     }
     return tool.parameters
   }
-  
+
   return null
 }
 
@@ -64,18 +75,20 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
     ),
     children: (
       <div className="space-y-4">
-        <div>
-          <Text strong className="text-sm">Description:</Text>
-          <div className="mt-1 p-3 bg-gray-50 rounded">
-            <Text className="text-xs whitespace-pre-wrap">{tool.description}</Text>
+        {tool.description && (
+          <div>
+            <Text strong className="text-sm">Description:</Text>
+            <div className="mt-1 p-3 bg-gray-50 rounded">
+              <Text className="text-xs whitespace-pre-wrap">{tool.description}</Text>
+            </div>
           </div>
-        </div>
-        
+        )}
+
         {(() => {
           const paramsObj = getParametersObject(tool)
-          
+
           if (!paramsObj) return null
-          
+
           return (
             <div>
               <div className="flex items-center gap-2 mb-2">
@@ -92,14 +105,8 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
 
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-2 mb-2">
-        <FileTextOutlined className="text-purple-500" />
-        <Text className="text-sm text-gray-600">
-          {tools.length} tool{tools.length > 1 ? 's' : ''} declared
-        </Text>
-      </div>
-      <Collapse 
-        items={toolItems} 
+      <Collapse
+        items={toolItems}
         defaultActiveKey={tools.length === 1 ? ['tool-0'] : []}
         className={styles.toolDeclarationCollapse}
       />

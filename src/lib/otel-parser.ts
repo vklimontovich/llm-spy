@@ -1,120 +1,5 @@
-import { z } from 'zod'
-
-// Parsed attribute value (after conversion from protobuf format)
-type ParsedAttributeValue = string | number | boolean | any[] | Record<string, any>
-
-// LLM-specific attributes
-const LLMAttributesSchema = z.object({
-  request: z.object({
-    type: z.string().optional(),
-    model: z.string().optional(),
-    functions: z.array(z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      parameters: z.any().optional()
-    })).optional()
-  }).optional(),
-  response: z.object({
-    model: z.string().optional(),
-    id: z.string().optional(),
-    finish_reason: z.string().optional()
-  }).optional(),
-  prompt: z.array(z.object({
-    role: z.string(),
-    content: z.string().optional(),
-    tool_calls: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      arguments: z.string()
-    })).optional()
-  })).optional(),
-  usage: z.object({
-    total_tokens: z.number().optional(),
-    prompt_tokens: z.number().optional(),
-    completion_tokens: z.number().optional()
-  }).optional(),
-  headers: z.string().optional(),
-  is_streaming: z.boolean().optional()
-}).passthrough() // Allow additional properties
-
-// GenAI-specific attributes
-const GenAIAttributesSchema = z.object({
-  system: z.string().optional(),
-  request: z.object({
-    model: z.string().optional(),
-    functions: z.array(z.object({
-      name: z.string(),
-      description: z.string().optional(),
-      parameters: z.any().optional()
-    })).optional()
-  }).optional(),
-  response: z.object({
-    model: z.string().optional(),
-    id: z.string().optional()
-  }).optional(),
-  prompt: z.array(z.object({
-    role: z.string(),
-    content: z.string().optional(),
-    tool_calls: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      arguments: z.string()
-    })).optional()
-  })).optional(),
-  completion: z.array(z.object({
-    role: z.string().optional(),
-    content: z.string().optional(),
-    finish_reason: z.string().optional(),
-    tool_calls: z.array(z.object({
-      id: z.string(),
-      name: z.string(),
-      arguments: z.string()
-    })).optional()
-  })).optional(),
-  usage: z.object({
-    prompt_tokens: z.number().optional(),
-    completion_tokens: z.number().optional()
-  }).optional(),
-  openai: z.object({
-    api_base: z.string().optional(),
-    system_fingerprint: z.string().optional()
-  }).optional()
-}).passthrough() // Allow additional properties
-
-// Parsed span with structured attributes
-const ParsedSpanSchema = z.object({
-  name: z.string(),
-  traceId: z.string(),
-  spanId: z.string(),
-  parentSpanId: z.string().optional(),
-  kind: z.string().optional(),
-  startTime: z.number(),
-  endTime: z.number(),
-  duration: z.number(),
-  status: z.object({
-    code: z.union([z.string(), z.number()]).optional(),
-    message: z.string().optional()
-  }).optional(),
-  llm: LLMAttributesSchema.optional(),
-  gen_ai: GenAIAttributesSchema.optional(),
-  attributes: z.record(z.any()),
-  resource: z.record(z.any()).optional(),
-  scope: z.object({
-    name: z.string(),
-    version: z.string().optional()
-  }).optional()
-}).passthrough() // Allow custom properties
-
-// Parsed traces result
-export const ParsedTracesSchema = z.object({
-  spans: z.array(ParsedSpanSchema)
-})
-
-// Export types
-export type LLMAttributes = z.infer<typeof LLMAttributesSchema>
-export type GenAIAttributes = z.infer<typeof GenAIAttributesSchema>
-export type ParsedSpan = z.infer<typeof ParsedSpanSchema>
-export type ParsedTraces = z.infer<typeof ParsedTracesSchema>
+import type { ParsedAttributeValue, ParsedSpan, ParsedTraces } from './format/otel-types'
+export { ParsedTracesSchema, type LLMAttributes, type GenAIAttributes, type ParsedSpan, type ParsedTraces } from './format/otel-types'
 
 // Helper function to extract attribute value from OTEL format
 function extractAttributeValue(value: any): ParsedAttributeValue {
@@ -278,157 +163,23 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
   return { spans: parsedSpans }
 }
 
-import type { PromptItem } from './content-utils'
+// Re-export the conversion functions from the new location
+export { otelSpansToModel } from './format/otel-to-model'
 
-// Transform OTEL spans to prompt items for display
-export function otelSpansToPromptItems(spans: ParsedSpan[]): PromptItem[] {
-  const prompts: PromptItem[] = []
+// Legacy exports for backward compatibility (can be removed later)
+import type { ModelMessage } from 'ai'
+import { otelSpansToModel } from './format/otel-to-model'
 
-  // Collect prompts from all spans
-  for (const span of spans) {
-    // Extract prompts from gen_ai attributes
-    if (span.gen_ai?.prompt && Array.isArray(span.gen_ai.prompt)) {
-      for (const prompt of span.gen_ai.prompt) {
-        // Check if this prompt has both content AND tool_calls (assistant messages between tool calls)
-        if (prompt.content && prompt.tool_calls && Array.isArray(prompt.tool_calls)) {
-          // First add the content as a regular message
-          prompts.push({
-            role: prompt.role === 'tool' ? 'tool result' : prompt.role,
-            content: prompt.content
-          })
-          
-          // Then add the tool calls
-          const toolCallContents = prompt.tool_calls.map(tc => ({
-            type: 'tool_use' as const,
-            toolName: tc.name,
-            toolId: tc.id,
-            content: tc.arguments
-          }))
-          
-          prompts.push({
-            role: prompt.role,
-            content: toolCallContents,
-            type: 'text'
-          })
-        } else if (prompt.tool_calls && Array.isArray(prompt.tool_calls)) {
-          // Just tool calls without content
-          const toolCallContents = prompt.tool_calls.map(tc => ({
-            type: 'tool_use' as const,
-            toolName: tc.name,
-            toolId: tc.id,
-            content: tc.arguments
-          }))
-          
-          prompts.push({
-            role: prompt.role === 'tool' ? 'tool result' : prompt.role,
-            content: toolCallContents,
-            type: 'text'
-          })
-        } else {
-          // Regular text prompt
-          prompts.push({
-            role: prompt.role === 'tool' ? 'tool result' : prompt.role,
-            content: prompt.content || '',
-            ...(prompt.role === 'tool' && { type: 'tool_result' as const })
-          })
-        }
-      }
-    }
-    
-    // Extract completions from gen_ai attributes
-    if (span.gen_ai?.completion && Array.isArray(span.gen_ai.completion)) {
-      for (const completion of span.gen_ai.completion) {
-        // Check if this completion has both content AND tool_calls
-        if (completion.content && completion.tool_calls && Array.isArray(completion.tool_calls)) {
-          // First add the content as a regular message
-          prompts.push({
-            role: completion.role || 'assistant',
-            content: completion.content
-          })
-          
-          // Then add the tool calls
-          const toolCallContents = completion.tool_calls.map(tc => ({
-            type: 'tool_use' as const,
-            toolName: tc.name,
-            toolId: tc.id,
-            content: tc.arguments
-          }))
-          
-          prompts.push({
-            role: completion.role || 'assistant',
-            content: toolCallContents,
-            type: 'text'
-          })
-        } else if (completion.tool_calls && Array.isArray(completion.tool_calls)) {
-          // Just tool calls without content
-          const toolCallContents = completion.tool_calls.map(tc => ({
-            type: 'tool_use' as const,
-            toolName: tc.name,
-            toolId: tc.id,
-            content: tc.arguments
-          }))
-          
-          prompts.push({
-            role: completion.role || 'assistant',
-            content: toolCallContents,
-            type: 'text'
-          })
-        } else if (completion.content) {
-          // Regular completion content
-          prompts.push({
-            role: completion.role || 'assistant',
-            content: completion.content
-          })
-        }
-      }
-    }
-    
-    // Extract prompts from llm attributes
-    if (span.llm?.prompt && Array.isArray(span.llm.prompt)) {
-      for (const prompt of span.llm.prompt) {
-        // Handle tool calls
-        if (prompt.tool_calls && Array.isArray(prompt.tool_calls)) {
-          // Create a single prompt item with tool calls as content array
-          const toolCallContents = prompt.tool_calls.map(tc => ({
-            type: 'tool_use' as const,
-            toolName: tc.name,
-            toolId: tc.id,
-            content: tc.arguments
-          }))
-          
-          prompts.push({
-            role: prompt.role === 'tool' ? 'tool result' : prompt.role,
-            content: toolCallContents,
-            type: 'text'
-          })
-        } else {
-          // Regular text prompt
-          prompts.push({
-            role: prompt.role === 'tool' ? 'tool result' : prompt.role,
-            content: prompt.content || '',
-            ...(prompt.role === 'tool' && { type: 'tool_result' as const })
-          })
-        }
-      }
-    }
-  }
-
-  return prompts
+export function otelSpansToPromptItems(spans: ParsedSpan[]): ModelMessage[] {
+  const model = otelSpansToModel(spans)
+  return model.modelMessages
 }
 
-// Extract tool declarations from OTEL spans
 export function otelSpansToToolDeclarations(spans: ParsedSpan[]): any[] {
-  for (const span of spans) {
-    // Check in llm.request.functions
-    if (span.llm?.request?.functions && Array.isArray(span.llm.request.functions)) {
-      return span.llm.request.functions
-    }
-    
-    // Check in gen_ai attributes if not found in llm
-    if (span.gen_ai?.request?.functions && Array.isArray(span.gen_ai.request.functions)) {
-      return span.gen_ai.request.functions
-    }
-  }
-  
-  return []
+  const model = otelSpansToModel(spans)
+  return model.tools.map(t => ({
+    name: t.name,
+    description: t.description,
+    parameters: t.inputSchema
+  }))
 }

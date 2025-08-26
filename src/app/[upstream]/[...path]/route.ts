@@ -73,7 +73,10 @@ async function handleProxy(
 
 
     const upstream = await prisma.upstream.findUnique({
-      where: { name: upstreamName },
+      where: { 
+        name: upstreamName,
+        deletedAt: null
+      },
     })
 
     if (!upstream) {
@@ -102,8 +105,27 @@ async function handleProxy(
       }
     })
 
-    if (upstream.headers && typeof upstream.headers === 'object') {
-      Object.entries(upstream.headers).forEach(([key, value]) => requestHeaders[String(key).toLowerCase()] = String(value))
+    // Apply upstream headers based on format (array or object)
+    if (upstream.headers) {
+      if (Array.isArray(upstream.headers)) {
+        // New format: array of {name, value, priority}
+        // Apply low priority headers first, then high priority (which can override)
+        const sortedHeaders = [...upstream.headers].sort((a: any, b: any) => {
+          if (a.priority === 'low' && b.priority === 'high') return -1
+          if (a.priority === 'high' && b.priority === 'low') return 1
+          return 0
+        })
+        sortedHeaders.forEach((header: any) => {
+          if (header.name) {
+            requestHeaders[header.name.toLowerCase()] = header.value
+          }
+        })
+      } else if (typeof upstream.headers === 'object') {
+        // Old format: object
+        Object.entries(upstream.headers).forEach(([key, value]) => {
+          requestHeaders[String(key).toLowerCase()] = String(value)
+        })
+      }
     }
 
     if (!upstream.url) {

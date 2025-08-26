@@ -2,13 +2,13 @@
 
 import { Typography, Dropdown, Button } from 'antd'
 import { EyeOutlined, UserOutlined, LogoutOutlined } from '@ant-design/icons'
-import { useRouter, usePathname } from 'next/navigation'
+import { usePathname } from 'next/navigation'
 import { signOut, useSession } from 'next-auth/react'
+import Link from 'next/link'
 
 const { Title } = Typography
 
 export default function Header() {
-  const router = useRouter()
   const pathname = usePathname()
   const { data: session } = useSession()
 
@@ -41,27 +41,23 @@ export default function Header() {
             HTTP Capture
           </Title>
           
-          <nav className="flex gap-6">
-            <button
-              onClick={() => router.push('/requests')}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                isActive('/requests')
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Requests
-            </button>
-            <button
-              onClick={() => router.push('/upstreams')}
-              className={`px-3 py-2 text-sm font-medium transition-colors ${
-                isActive('/upstreams')
-                  ? 'text-blue-600 border-b-2 border-blue-600'
-                  : 'text-gray-600 hover:text-gray-900'
-              }`}
-            >
-              Upstreams
-            </button>
+          <nav className="flex gap-2">
+            <Link href="/requests">
+              <Button 
+                type={isActive('/requests') ? 'primary' : 'text'}
+                className={isActive('/requests') ? 'border-b-2 border-blue-600' : ''}
+              >
+                Requests
+              </Button>
+            </Link>
+            <Link href="/upstreams">
+              <Button 
+                type={isActive('/upstreams') ? 'primary' : 'text'}
+                className={isActive('/upstreams') ? 'border-b-2 border-blue-600' : ''}
+              >
+                Upstreams
+              </Button>
+            </Link>
           </nav>
         </div>
         

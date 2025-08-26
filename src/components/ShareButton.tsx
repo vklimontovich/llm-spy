@@ -4,13 +4,14 @@ import { Button } from 'antd'
 import { Lock, Unlock } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useSearchParams } from 'next/navigation'
 
 interface ShareButtonProps {
   requestId: string
-  activeTab: string
 }
 
-export default function ShareButton({ requestId, activeTab }: ShareButtonProps) {
+export default function ShareButton({ requestId }: ShareButtonProps) {
+  const searchParams = useSearchParams()
   const [copyText, setCopyText] = useState('Copy Public Link')
   const queryClient = useQueryClient()
 
@@ -51,7 +52,8 @@ export default function ShareButton({ requestId, activeTab }: ShareButtonProps) 
   })
 
   const copyShareLink = () => {
-    const shareUrl = `${window.location.origin}/share?id=${requestId}&tab=${activeTab}`
+    const tab = searchParams.get('tab') || 'chat'
+    const shareUrl = `${window.location.origin}/share?id=${requestId}&tab=${tab}`
     navigator.clipboard.writeText(shareUrl)
     setCopyText('Copied!')
     setTimeout(() => setCopyText('Copy Public Link'), 2000)

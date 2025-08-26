@@ -41,13 +41,31 @@ model UserProvisionRule {
 }
 
 model Upstream {
-  id        String   @id @default(cuid())
-  name      String   @unique
-  url       String?
-  headers   Json?
-  createdAt DateTime @default(now())
+  id            String         @id @default(cuid())
+  name          String         @unique
+  url           String?
+  headers       Json?
+  inputFormat   String         @default("auto") @map("input_format")
+  outputFormat  String?        @map("output_format")
+  deletedAt     DateTime?      @map("deleted_at")
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @default(now()) @updatedAt
+  otelUpstreams OtelUpstream[]
 
   @@map("upstreams")
+}
+
+model OtelUpstream {
+  id         String   @id @default(cuid())
+  url        String
+  headers    Json?
+  upstreamId String
+  upstream   Upstream @relation(fields: [upstreamId], references: [id], onDelete: Cascade)
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([upstreamId])
+  @@map("otel_upstreams")
 }
 
 model Response {

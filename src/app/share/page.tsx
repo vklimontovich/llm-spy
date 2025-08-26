@@ -6,7 +6,7 @@ import { useState, useEffect, Suspense } from 'react'
 import { Button, Spin } from 'antd'
 import { ArrowLeft, Lock } from 'lucide-react'
 import { useSession } from 'next-auth/react'
-import RequestResponseTabs from '@/components/RequestResponseTabs'
+import RequestView from '@/components/RequestView'
 import { RequestResponse } from '@/app/(protected)/requests/page'
 
 function SharePageContent() {
@@ -14,10 +14,8 @@ function SharePageContent() {
   const router = useRouter()
   const { data: session } = useSession()
   const [selectedRequest, setSelectedRequest] = useState<RequestResponse | null>(null)
-  const [activeTab, setActiveTab] = useState<string>('request')
 
   const requestId = searchParams.get('id')
-  const tab = searchParams.get('tab')
 
   const { data: request, isLoading, error, isError } = useQuery({
     queryKey: ['shared-request', requestId],
@@ -33,21 +31,18 @@ function SharePageContent() {
       return response.json()
     },
     enabled: !!requestId,
-    retry: false
+    retry: false,
   })
 
   useEffect(() => {
     if (request) {
       setSelectedRequest(request)
-      if (tab) {
-        setActiveTab(tab)
-      }
     }
-  }, [request, tab])
+  }, [request])
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Spin size="large" />
           <div className="text-lg text-gray-600">Loading shared request...</div>
@@ -59,7 +54,7 @@ function SharePageContent() {
   if (isError && error?.message === 'not_shared') {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-50">
-        <div className="bg-white rounded-lg shadow-lg p-8 max-w-md text-center">
+        <div className="bg-white rounded-lg p-8 max-w-md text-center">
           <Lock className="w-16 h-16 text-gray-400 mx-auto mb-4" />
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Request Not Shared</h2>
           <p className="text-gray-600 mb-6">
@@ -96,38 +91,32 @@ function SharePageContent() {
   }
 
   const handleBackToInternal = () => {
-    router.push(`/requests?id=${requestId}&tab=${activeTab}`)
+    const tab = searchParams.get('tab') || 'chat'
+    router.push(`/requests?id=${requestId}&tab=${tab}`)
   }
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen">
       <div className="p-6">
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div>
-              <h1 className="text-2xl font-bold">Shared Request</h1>
-              <p className="text-gray-600">View shared HTTP request and response</p>
-            </div>
-            {session && (
-              <Button
-                type="primary"
-                icon={<ArrowLeft className="w-4 h-4" />}
-                onClick={handleBackToInternal}
-              >
-                Back to Internal View
-              </Button>
-            )}
+        <div className="mb-4 flex items-center justify-between">
+          <div>
+            <h1 className="text-2xl font-bold">LLM Request</h1>
           </div>
-          
-          <div className="border-t pt-4">
-            {selectedRequest && (
-              <RequestResponseTabs
-                selectedRequest={selectedRequest}
-                activeTab={activeTab}
-                onTabChange={setActiveTab}
-              />
-            )}
-          </div>
+          {session && (
+            <Button
+              type="primary"
+              icon={<ArrowLeft className="w-4 h-4" />}
+              onClick={handleBackToInternal}
+            >
+              Back to Internal View
+            </Button>
+          )}
+        </div>
+
+        <div className="border-t pt-4">
+          {selectedRequest && (
+            <RequestView selectedRequest={selectedRequest} />
+          )}
         </div>
       </div>
     </div>
@@ -137,7 +126,7 @@ function SharePageContent() {
 export default function SharePage() {
   return (
     <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
           <Spin size="large" />
           <div className="text-lg text-gray-600">Loading...</div>
