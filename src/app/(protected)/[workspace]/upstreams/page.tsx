@@ -3,20 +3,20 @@
 import { useQuery } from '@tanstack/react-query'
 import { Button } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import UpstreamList from '@/components/UpstreamList'
+import { useWorkspaceApi } from '@/lib/api'
 
 export default function UpstreamsPage() {
   const router = useRouter()
+  const params = useParams()
+  const api = useWorkspaceApi()
   
   const { data: upstreams, isLoading, error } = useQuery({
     queryKey: ['upstreams'],
     queryFn: async () => {
-      const response = await fetch('/api/upstreams')
-      if (!response.ok) {
-        throw new Error('Failed to fetch upstreams')
-      }
-      return response.json()
+      const response = await api.get('/upstreams')
+      return response.data
     }
   })
 
@@ -38,7 +38,7 @@ export default function UpstreamsPage() {
         <Button
           type="primary"
           icon={<PlusOutlined />}
-          onClick={() => router.push('/upstreams/new')}
+          onClick={() => router.push(`/${params.workspace}/upstreams/new`)}
         >
           Add Upstream
         </Button>

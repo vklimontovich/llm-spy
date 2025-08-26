@@ -24,5 +24,11 @@ export interface ProviderParser {
    * @param events
    */
   parseSSE(events: SSEEvent[]): any ;
+
+  /**
+   * Converts a ConversationModel back to the provider's response format
+   * @param conversation The standardized conversation model
+   */
+  toResponse?(conversation: ConversationModel): any;
 }
 

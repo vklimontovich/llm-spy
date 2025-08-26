@@ -15,6 +15,7 @@
     "proto:update": "npm run proto:fetch && npm run proto:generate"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^2.0.22",
     "@ant-design/icons": "^6.0.0",
     "@ant-design/nextjs-registry": "^1.0.2",
     "@microlink/react-json-view": "^1.23.4",
@@ -27,6 +28,7 @@
     "@types/pako": "^2.0.3",
     "ai": "^5.0.23",
     "antd": "^5.25.3",
+    "axios": "^1.11.0",
     "dayjs": "^1.11.13",
     "eventsource-parser": "^3.0.5",
     "lucide-react": "^0.513.0",

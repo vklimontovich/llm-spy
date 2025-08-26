@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
-import { useRouter } from 'next/navigation'
+import { useRouter, useParams } from 'next/navigation'
 import { Button, Select } from 'antd'
 import {
   Plus,
@@ -17,6 +17,8 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
+import { useWorkspaceApi } from '@/lib/api'
+import ConnectionInstructions from './ConnectionInstructions'
 
 interface Header {
   name: string
@@ -159,7 +161,9 @@ const ErrorState = ({ message }: { message: string }) => (
 
 export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   const router = useRouter()
+  const params = useParams()
   const queryClient = useQueryClient()
+  const api = useWorkspaceApi()
   const isNew = id === 'new'
 
   const [formData, setFormData] = useState<UpstreamData>({
@@ -175,20 +179,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     queryKey: ['upstream', id],
     queryFn: async () => {
       if (isNew) return null
-      const response = await fetch(`/api/upstreams/${id}`)
-      if (!response.ok) {
-        throw new Error('Failed to fetch upstream')
-      }
-      return response.json()
+      const response = await api.get(`/upstreams/${id}`)
+      return response.data
     },
     enabled: !isNew
   })
 
   const saveMutation = useMutation({
     mutationFn: async (data: UpstreamData) => {
-      const url = isNew ? '/api/upstreams' : `/api/upstreams/${id}`
-      const method = isNew ? 'POST' : 'PUT'
-
       // Convert override boolean to priority for API
       const apiData = {
         ...data,
@@ -207,21 +205,17 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
         }))
       }
 
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(apiData)
-      })
-
-      if (!response.ok) {
-        const error = await response.text()
-        throw new Error(error || 'Failed to save upstream')
+      if (isNew) {
+        const response = await api.post('/upstreams', apiData)
+        return response.data
+      } else {
+        const response = await api.put(`/upstreams/${id}`, apiData)
+        return response.data
       }
-      return response.json()
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
-      router.push('/upstreams')
+      router.push(`/${params.workspace}/upstreams`)
     }
   })
 
@@ -320,6 +314,17 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="flex flex-col gap-6">
+        {/* Connection Instructions */}
+        {!isNew && formData.name && (
+          <div className="mb-6">
+            <ConnectionInstructions 
+              workspaceSlug={params.workspace as string} 
+              upstreamName={formData.name}
+              compact={false}
+            />
+          </div>
+        )}
+
         {/* General Section */}
         <Section title="General" icon={Settings}>
           <div className="flex flex-col gap-4">
@@ -569,7 +574,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
         {/* Action Buttons */}
         <div className="flex items-center justify-between py-4">
           <Button
-            onClick={() => router.push('/upstreams')}
+            onClick={() => router.push(`/${params.workspace}/upstreams`)}
             icon={<X className="w-4 h-4" />}
             size="large"
           >

@@ -1,6 +1,6 @@
 'use client'
 
-import { Typography, Badge } from 'antd'
+import { Typography } from 'antd'
 import { User, Bot, Settings, Wrench, MessageSquare } from 'lucide-react'
 import SmartContentView from './SmartContentView'
 import type { ModelMessage } from 'ai'
@@ -62,10 +62,10 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
       const splitMessages: ModelMessage[] = message.content.map((part) => ({
         ...message,
         content: [part] // Each message now has single content item
-      }))
+      } as ModelMessage))
 
       // Determine group role
-      let groupRole: 'system' | 'user' | 'assistant' = message.role === 'tool' ? 'user' : message.role as any
+      const groupRole: 'system' | 'user' | 'assistant' = message.role === 'tool' ? 'user' : message.role as any
 
       if (groupId !== undefined) {
         // Add to existing group or create new one
@@ -167,7 +167,7 @@ function MessageContent({ message }: { message: ModelMessage }) {
         return (
           <div>
             <Text className="text-xs text-gray-500 mb-1">Image</Text>
-            <SmartContentView data={'image' in part ? part.image : part.data} />
+            <SmartContentView data={(part as any).image || (part as any).data} />
           </div>
         )
 
@@ -175,7 +175,7 @@ function MessageContent({ message }: { message: ModelMessage }) {
         return (
           <div>
             <Text className="text-xs text-gray-500 mb-1">File</Text>
-            <SmartContentView data={part.data} />
+            <SmartContentView data={(part as any).data} />
           </div>
         )
 

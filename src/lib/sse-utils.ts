@@ -32,7 +32,7 @@ export function parseSSEEvents(raw: string): SSEEvent[] {
           id: message.id,
           data: jsonData
         })
-      } catch (e) {
+      } catch {
         // If not JSON, store raw data string
         events.push({
           event: message.event,

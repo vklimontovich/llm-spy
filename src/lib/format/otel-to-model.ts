@@ -96,8 +96,6 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
     // Extract completions from gen_ai attributes
     if (span.gen_ai?.completion && Array.isArray(span.gen_ai.completion)) {
       for (const completion of span.gen_ai.completion) {
-        const role = (completion.role || 'assistant') as 'assistant'
-
         // Check if this completion has tool_calls
         if (completion.tool_calls && Array.isArray(completion.tool_calls)) {
           const parts: any[] = []

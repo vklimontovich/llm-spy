@@ -1,11 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { requireAuth } from '@/lib/auth'
+import { checkWorkspaceAuth } from '@/lib/auth'
 
 export async function GET(request: NextRequest) {
-  await requireAuth()
-  
   try {
+    const { workspace } = await checkWorkspaceAuth(request)
     const { searchParams } = new URL(request.url)
     const cursor = searchParams.get('cursor')
     const limit = parseInt(searchParams.get('limit') || '20', 10)
@@ -18,6 +17,9 @@ export async function GET(request: NextRequest) {
     }
 
     const responses = await prisma.response.findMany({
+      where: {
+        workspaceId: workspace.id
+      },
       take: limit + 1,
       ...(cursor && {
         cursor: { id: cursor },
@@ -64,6 +66,16 @@ export async function GET(request: NextRequest) {
 
   } catch (error) {
     console.error('Error fetching requests:', error)
+    if (error instanceof Error && (
+      error.message.includes('X-Workspace-Id') || 
+      error.message.includes('Workspace not found') ||
+      error.message.includes('Unauthorized')
+    )) {
+      return NextResponse.json(
+        { error: error.message },
+        { status: error.message.includes('Unauthorized') ? 401 : 400 }
+      )
+    }
     return NextResponse.json(
       { 
         error: 'Internal server error',

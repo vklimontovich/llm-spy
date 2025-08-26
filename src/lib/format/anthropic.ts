@@ -275,13 +275,115 @@ export class AnthropicParser implements ProviderParser {
     return 'anthropic';
   }
 
-  createConversation(payloadUnknown: unknown, responseUnknown?: unknown): ConversationModel | undefined {
+  createConversation(payloadUnknown: unknown | null, responseUnknown?: unknown): ConversationModel | undefined {
     try {
+      if (payloadUnknown === null && responseUnknown) {
+        // When payload is null, create minimal conversation from response only
+        return this.responseToModel(responseUnknown);
+      }
       return anthropicToModel(payloadUnknown, responseUnknown);
     } catch (error) {
       console.error('Failed to parse Anthropic conversation:', error);
       return undefined;
     }
+  }
+
+  private responseToModel(responseUnknown: unknown): ConversationModel {
+    const response = responseUnknown as any;
+    const out: ModelMessage[] = [];
+    
+    if (response.role === 'assistant' && response.content) {
+      const assistantContent: any[] = [];
+      
+      if (typeof response.content === 'string') {
+        assistantContent.push({ type: 'text' as const, text: response.content });
+      } else if (Array.isArray(response.content)) {
+        for (const part of response.content) {
+          if (part.type === 'text') {
+            assistantContent.push({ type: 'text' as const, text: part.text || '' });
+          } else if (part.type === 'tool_use') {
+            assistantContent.push({
+              type: 'tool-call' as const,
+              toolCallId: part.id || `tool-${Date.now()}`,
+              toolName: part.name,
+              args: part.input,
+            });
+          }
+        }
+      }
+      
+      if (assistantContent.length > 0) {
+        out.push({
+          role: 'assistant',
+          content: assistantContent,
+          providerOptions: { originalMessageGroup: '0' }
+        } as unknown as ModelMessage);
+      }
+    }
+    
+    return {
+      modelMessages: out,
+      tools: [],
+      meta: {
+        model: response.model || 'unknown',
+        stream: false,
+      },
+    };
+  }
+
+  toResponse(conversation: ConversationModel): any {
+    // Convert ConversationModel back to Anthropic response format
+    const lastMessage = conversation.modelMessages[conversation.modelMessages.length - 1];
+    
+    if (!lastMessage || lastMessage.role !== 'assistant') {
+      // Return a minimal assistant response
+      return {
+        id: `msg_${Date.now()}`,
+        type: 'message',
+        role: 'assistant',
+        content: [{ type: 'text', text: '' }],
+        model: conversation.meta.model,
+        stop_reason: 'end_turn',
+        stop_sequence: null,
+        usage: {
+          input_tokens: 0,
+          output_tokens: 0,
+        },
+      };
+    }
+    
+    const content: any[] = [];
+    
+    if (Array.isArray(lastMessage.content)) {
+      for (const part of lastMessage.content) {
+        if (part.type === 'text') {
+          content.push({ type: 'text', text: part.text });
+        } else if (part.type === 'tool-call') {
+          content.push({
+            type: 'tool_use',
+            id: part.toolCallId,
+            name: part.toolName,
+            input: (part as any).args,
+          });
+        }
+      }
+    } else if (typeof lastMessage.content === 'string') {
+      content.push({ type: 'text', text: lastMessage.content });
+    }
+    
+    return {
+      id: `msg_${Date.now()}`,
+      type: 'message',
+      role: 'assistant',
+      content,
+      model: conversation.meta.model,
+      stop_reason: 'end_turn',
+      stop_sequence: null,
+      usage: {
+        input_tokens: 0,
+        output_tokens: 0,
+      },
+    };
   }
 
   parseSSE(events: SSEEvent[]): any | undefined {

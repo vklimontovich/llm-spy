@@ -37,7 +37,7 @@ async function decompressResponse(responseBody: ArrayBuffer, contentEncoding: st
 
 const AUTH_HEADER = 'x-monitor-auth'
 
-async function validateAuthKey(request: NextRequest): Promise<void> {
+async function validateAuthKey(request: NextRequest, workspaceId: string | null): Promise<void> {
   if (process.env.DISABLE_AUTHENTICATION === 'true') {
     return
   }
@@ -55,7 +55,12 @@ async function validateAuthKey(request: NextRequest): Promise<void> {
   })
 
   if (!authKey) {
-    throw new HttpError(401, 'Unauthorized: Invalid or missing API key. Use X-Auth header')
+    throw new HttpError(401, 'Unauthorized: Invalid or missing API key')
+  }
+
+  // Check if auth key belongs to the workspace (if workspaceId is provided)
+  if (workspaceId && authKey.workspaceId && authKey.workspaceId !== workspaceId) {
+    throw new HttpError(401, 'Unauthorized: API key does not belong to this workspace')
   }
 }
 
@@ -66,15 +71,39 @@ async function handleProxy(
 ) {
   const method = request.method.toUpperCase()
   try {
-    await validateAuthKey(request)
-
     const _params = await params
-    const { upstream: upstreamName } = _params
+    const { upstream: upstreamName, workspace } = _params
 
 
-    const upstream = await prisma.upstream.findUnique({
-      where: { 
-        name: upstreamName,
+    // First find the workspace by ID or slug
+    const foundWorkspace = await prisma.workspace.findFirst({
+      where: {
+        OR: [
+          { id: workspace },
+          { slug: workspace }
+        ]
+      }
+    })
+
+    if (!foundWorkspace) {
+      console.log(`Workspace not found: ${workspace} for method ${method} ${request.url}`)
+      return NextResponse.json(
+        { error: 'Workspace not found' },
+        { status: 404 },
+      )
+    }
+
+    // Validate auth key belongs to this workspace
+    await validateAuthKey(request, foundWorkspace.id)
+
+    // Find upstream by name or ID within the workspace
+    const upstream = await prisma.upstream.findFirst({
+      where: {
+        OR: [
+          { name: upstreamName },
+          { id: upstreamName }
+        ],
+        workspaceId: foundWorkspace.id,
         deletedAt: null
       },
     })
@@ -155,6 +184,7 @@ async function handleProxy(
           responseBody: Buffer.from(responseBody),
           requestHeaders,
           responseHeaders,
+          workspaceId: foundWorkspace.id,
         },
       })
 
@@ -165,14 +195,29 @@ async function handleProxy(
     }
 
     const url = new URL(request.url)
-    const targetUrl = `${upstream.url}${url.pathname.replace(`/${upstreamName}`, '')}${url.search}`
+    const targetUrl = `${upstream.url}${url.pathname.replace(`/${workspace}/${upstreamName}`, '')}${url.search}`
 
+    // Check if format conversion is needed
+    const needsConversion = (upstream.outputFormat && upstream.inputFormat !== upstream.outputFormat);
+    if (needsConversion && (!decompressedRequestBody || decompressedRequestBody.length === 0)) {
+      return NextResponse.json(
+        { error: 'Request body required for format conversion' },
+        { status: 400 },
+      )
+    }
 
-    const response = await fetch(targetUrl, {
-      method,
-      headers: requestHeaders,
-      body: requestBody,
-    })
+    let response: Response;
+
+    if (needsConversion && decompressedRequestBody) {
+      throw new Error("Not implemented")
+    } else {
+      // Regular proxy without conversion
+      response = await fetch(targetUrl, {
+        method,
+        headers: requestHeaders,
+        body: requestBody,
+      });
+    }
 
     console.log(`Proxying ${method.toUpperCase()} ${request.url} -> ${targetUrl}. Response status: ${response.status}`)
     console.log(`Request headers:\n`, requestHeaders)
@@ -242,7 +287,7 @@ async function handleProxy(
 
         // Get content encoding and decompress if needed
         const contentEncoding = response.headers.get('content-encoding')
-        const decompressedBody = await decompressResponse(capturedBody.buffer, contentEncoding)
+        const decompressedBody =  await decompressResponse(capturedBody.buffer, contentEncoding)
 
         // Store in database
         await prisma.response.create({
@@ -254,6 +299,7 @@ async function handleProxy(
             responseBody: decompressedBody,
             requestHeaders,
             responseHeaders,
+            workspaceId: foundWorkspace.id,
           },
         })
       } catch (error) {

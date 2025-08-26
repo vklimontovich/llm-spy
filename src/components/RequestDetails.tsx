@@ -3,7 +3,8 @@
 import { Drawer } from 'antd'
 import ShareButton from './ShareButton'
 import RequestView from './RequestView'
-import { RequestResponse } from '@/app/(protected)/requests/page'
+import { RequestResponse } from '@/app/(protected)/[workspace]/requests/page'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface RequestDetailsProps {
   selectedRequest: RequestResponse | null
@@ -16,6 +17,8 @@ export default function RequestDetails({
   onClose,
   showShare = false
 }: RequestDetailsProps) {
+  const { workspace } = useWorkspace()
+  
   const title = (
     <div className="flex items-center justify-between">
       <span>Request/Response Details</span>
@@ -36,7 +39,10 @@ export default function RequestDetails({
       onClose={onClose}
     >
       {selectedRequest && (
-        <RequestView selectedRequest={selectedRequest} />
+        <RequestView 
+          requestId={selectedRequest.id}
+          workspaceId={workspace.id}
+        />
       )}
     </Drawer>
   )

@@ -22,23 +22,23 @@ function extractAttributeValue(value: any): ParsedAttributeValue {
 // Helper to convert dot notation to nested object
 function dotNotationToObject(attributes: Record<string, ParsedAttributeValue>): Record<string, any> {
   const result: Record<string, any> = {}
-  
+
   for (const [key, value] of Object.entries(attributes)) {
     const parts = key.split('.')
     let current = result
-    
+
     for (let i = 0; i < parts.length - 1; i++) {
       const part = parts[i]
       // Handle array indices in the path (e.g., "prompt.0.role")
       const nextPart = parts[i + 1]
       const isArrayIndex = /^\d+$/.test(nextPart)
-      
+
       if (!current[part]) {
         current[part] = isArrayIndex ? [] : {}
       }
       current = current[part]
     }
-    
+
     const lastPart = parts[parts.length - 1]
     if (Array.isArray(current)) {
       const index = parseInt(lastPart)
@@ -49,7 +49,7 @@ function dotNotationToObject(attributes: Record<string, ParsedAttributeValue>): 
       current[lastPart] = value
     }
   }
-  
+
   // Convert sparse arrays to dense arrays
   const convertSparseArrays = (obj: any): any => {
     if (Array.isArray(obj)) {
@@ -74,22 +74,22 @@ function dotNotationToObject(attributes: Record<string, ParsedAttributeValue>): 
     }
     return obj
   }
-  
+
   return convertSparseArrays(result)
 }
 
 // Parse OTEL trace data
 export function parseOtelTrace(data: string | object): ParsedTraces {
   let jsonData: any
-  
+
   try {
     jsonData = typeof data === 'string' ? JSON.parse(data) : data
   } catch {
     throw new Error('Invalid JSON data provided')
   }
-  
+
   const parsedSpans: ParsedSpan[] = []
-  
+
   // Process resource spans
   const resourceSpans = jsonData.resourceSpans || []
   for (const resourceSpan of resourceSpans) {
@@ -100,7 +100,7 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
         resourceAttributes[attr.key] = extractAttributeValue(attr.value)
       }
     }
-    
+
     // Process scope spans
     const scopeSpans = resourceSpan.scopeSpans || []
     for (const scopeSpan of scopeSpans) {
@@ -108,27 +108,27 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
       for (const span of spans) {
         // Parse span attributes
         const flatAttributes: Record<string, ParsedAttributeValue> = {}
-        
+
         if (span.attributes) {
           for (const attr of span.attributes) {
             flatAttributes[attr.key] = extractAttributeValue(attr.value)
           }
         }
-        
+
         // Convert dot notation to nested structure
         const nestedAttributes = dotNotationToObject(flatAttributes)
-        
+
         // Extract specific attribute groups
         const llmAttributes = nestedAttributes.llm
         const genAiAttributes = nestedAttributes.gen_ai
-        
+
         // Remove structured attributes from general attributes
         delete nestedAttributes.llm
         delete nestedAttributes.gen_ai
-        
+
         // Transform resource attributes with dot notation
         const resourceNested = dotNotationToObject(resourceAttributes)
-        
+
         // Create parsed span
         const parsedSpan: ParsedSpan = {
           name: span.name || '',
@@ -136,8 +136,8 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
           spanId: span.spanId || '',
           parentSpanId: span.parentSpanId,
           kind: span.kind,
-          startTime: typeof span.startTimeUnixNano === 'string' 
-            ? parseInt(span.startTimeUnixNano) 
+          startTime: typeof span.startTimeUnixNano === 'string'
+            ? parseInt(span.startTimeUnixNano)
             : span.startTimeUnixNano || 0,
           endTime: typeof span.endTimeUnixNano === 'string'
             ? parseInt(span.endTimeUnixNano)
@@ -151,15 +151,15 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
           // Flatten resource attributes to top level
           ...resourceNested
         }
-        
+
         // Calculate duration in milliseconds
         parsedSpan.duration = (parsedSpan.endTime - parsedSpan.startTime) / 1_000_000
-        
+
         parsedSpans.push(parsedSpan)
       }
     }
   }
-  
+
   return { spans: parsedSpans }
 }
 
@@ -178,7 +178,7 @@ export function otelSpansToPromptItems(spans: ParsedSpan[]): ModelMessage[] {
 export function otelSpansToToolDeclarations(spans: ParsedSpan[]): any[] {
   const model = otelSpansToModel(spans)
   return model.tools.map(t => ({
-    name: t.name,
+    name: (t as any).name || 'unknown',
     description: t.description,
     parameters: t.inputSchema
   }))

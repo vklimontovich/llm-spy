@@ -1,20 +1,11 @@
 'use client'
 
-import { useRouter } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'antd'
-import {
-  Edit3,
-  Trash2,
-  Activity,
-  Globe,
-  Server,
-  MoreVertical,
-  Clock,
-  Hash,
-  Link2,
-} from 'lucide-react'
+import { Activity, Edit3, Hash, Link2, MoreVertical, Server, Trash2 } from 'lucide-react'
+import { useWorkspaceApi } from '@/lib/api'
 
 interface Upstream {
   id: string
@@ -57,11 +48,9 @@ const UpstreamSkeleton = () => (
 
 // Action Menu Component
 const ActionMenu = ({
-                      upstream,
                       onEdit,
                       onDelete,
                     }: {
-  upstream: Upstream
   onEdit: () => void
   onDelete: () => void
 }) => {
@@ -121,14 +110,8 @@ const UpstreamCard = ({
   isDeleting: boolean
 }) => {
   const router = useRouter()
-
-  const formatDate = (dateString: string) => {
-    const date = new Date(dateString)
-    return new Intl.RelativeTimeFormat('en', { numeric: 'auto' }).format(
-      Math.ceil((date.getTime() - Date.now()) / (1000 * 60 * 60 * 24)),
-      'day',
-    )
-  }
+  const params = useParams()
+  const workspaceSlug = params.workspace as string
 
   const headerCount = upstream.headers
     ? Array.isArray(upstream.headers)
@@ -168,25 +151,23 @@ const UpstreamCard = ({
           </div>
         </div>
         <ActionMenu
-          upstream={upstream}
-          onEdit={() => router.push(`/upstreams/${upstream.id}`)}
+          onEdit={() => router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)}
           onDelete={onDelete}
         />
       </div>
-
 
       <div className="flex items-end justify-between">
         <div className="flex gap-2">
           <Button
             type="primary"
             ghost
-            onClick={() => router.push(`/upstreams/${upstream.id}`)}
+            onClick={() => router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)}
             icon={<Edit3 className="w-3.5 h-3.5" />}
           >
             Edit
           </Button>
           <Button
-            onClick={() => router.push(`/requests?upstream=${upstream.name}`)}
+            onClick={() => router.push(`/${workspaceSlug}/requests?upstream=${upstream.name}`)}
             icon={<Activity className="w-3.5 h-3.5" />}
           >
             View Requests
@@ -220,17 +201,10 @@ const EmptyState = () => (
 export default function UpstreamList({ upstreams, isLoading }: UpstreamListProps) {
   const queryClient = useQueryClient()
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const api = useWorkspaceApi()
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => {
-      const response = await fetch(`/api/upstreams/${id}`, {
-        method: 'DELETE',
-      })
-      if (!response.ok) {
-        throw new Error('Failed to delete upstream')
-      }
-      return response.json()
-    },
+    mutationFn: async (id: string) => (await api.delete(`/upstreams/${id}`)).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
       setDeletingId(null)

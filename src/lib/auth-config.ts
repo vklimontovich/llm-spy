@@ -2,11 +2,16 @@ import GoogleProvider from "next-auth/providers/google"
 import { prisma } from "@/lib/prisma"
 import { hash } from "@/lib/hash"
 import { NextAuthOptions } from "next-auth"
+import { assertDefined } from '@/lib/preconditions'
 
 console.assert(process.env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET must be set in environment variables")
 console.assert(process.env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID must be set in environment variables")
 
 export const authOptions: NextAuthOptions = {
+  pages: {
+    signIn: '/signin',
+    error: '/signin/error', // Error code passed in query string as ?error=
+  },
   providers: [
     GoogleProvider({
       clientId: process.env.GOOGLE_CLIENT_ID!,
@@ -19,52 +24,72 @@ export const authOptions: NextAuthOptions = {
     })
   ],
   secret: process.env.NEXTAUTH_SECRET || hash(process.env.GOOGLE_CLIENT_SECRET!),
-  cookies: {
-    sessionToken: {
-      name: `__llm_monitor_user`,
-      options: {
-        httpOnly: true,
-        sameSite: 'lax',
-        path: '/',
-        secure: process.env.SECURE_COOKIES === "true" || process.env.SECURE_COOKIES === "1",
-      }
-    }
-  },
   callbacks: {
-    async signIn({ user }) {
-      if (!user.email) return false
+    async signIn({ user, account }) {
+      assertDefined(user.email, 'User email must be defined in signIn callback')
 
+      const provider = account?.provider || 'google'
+      const externalUserId = user.id
+
+      // First, lookup by provider and externalUserId
       let existingUser = await prisma.user.findUnique({
-        where: { email: user.email }
+        where: {
+          provider_externalUserId: {
+            provider,
+            externalUserId
+          }
+        }
       })
 
-      // If user doesn't exist, check provision rules
+      // If not found, check for legacy user (provider = null, externalUserId = null)
       if (!existingUser) {
-        // Extract domain from email
-        const emailDomain = user.email.split('@')[1].toLowerCase()
-        if (!emailDomain) return false
-
-        // Look for domain provision rule
-        const provisionRules = await prisma.userProvisionRule.findMany({
-          where: { ruleType: 'domain' }
+        existingUser = await prisma.user.findFirst({
+          where: {
+            email: user.email,
+            provider: null,
+            externalUserId: null
+          }
         })
 
-        // Check if any rule matches the user's domain
-        //TODO - use query instead of fetching all rules and filtering in memory
-        const matchingRule = provisionRules.find(rule => {
-          const ruleOptions = rule.ruleOptions as { domain?: string }
-          return ruleOptions.domain?.toLowerCase() === `@${emailDomain}`
-        })
-
-        if (matchingRule) {
-          // Create the user
-          existingUser = await prisma.user.create({
-            data: { email: user.email }
+        // If found legacy user, update with provider and externalUserId
+        if (existingUser) {
+          existingUser = await prisma.user.update({
+            where: { id: existingUser.id },
+            data: {
+              provider,
+              externalUserId
+            }
           })
         }
       }
 
-      return !!existingUser
+      // If still no user, create new user
+      if (!existingUser) {
+        existingUser = await prisma.user.create({
+          data: {
+            email: user.email,
+            provider,
+            externalUserId
+          }
+        })
+      }
+
+      return true;
+    },
+    async session({ session, token }) {
+      // Ensure the session includes the user's email
+      if (token?.email) {
+        session.user = session.user || {}
+        session.user.email = token.email as string
+      }
+      return session
+    },
+    async jwt({ token, user }) {
+      // Include user email in JWT token
+      if (user?.email) {
+        token.email = user.email
+      }
+      return token
     }
   }
 }

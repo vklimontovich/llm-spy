@@ -5,6 +5,7 @@ import { Lock, Unlock } from 'lucide-react'
 import { useState, useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
+import { useWorkspaceApi } from '@/lib/api'
 
 interface ShareButtonProps {
   requestId: string
@@ -14,14 +15,14 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
   const searchParams = useSearchParams()
   const [copyText, setCopyText] = useState('Copy Public Link')
   const queryClient = useQueryClient()
+  const api = useWorkspaceApi()
 
   // Fetch the current share status
   const { data: shareStatus, isLoading } = useQuery({
     queryKey: ['share-status', requestId],
     queryFn: async () => {
-      const response = await fetch(`/api/requests/${requestId}/status`)
-      if (!response.ok) throw new Error('Failed to fetch share status')
-      return response.json()
+      const response = await api.get(`/requests/${requestId}/status`)
+      return response.data
     },
     refetchInterval: false,
     staleTime: 30000, // Consider data stale after 30 seconds
@@ -36,13 +37,8 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
 
   const toggleShareMutation = useMutation({
     mutationFn: async (makePublic: boolean) => {
-      const response = await fetch(`/api/requests/${requestId}/share`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ public: makePublic })
-      })
-      if (!response.ok) throw new Error('Failed to toggle share')
-      return response.json()
+      const response = await api.post(`/requests/${requestId}/share`, { public: makePublic })
+      return response.data
     },
     onSuccess: () => {
       // Invalidate both the share status and the requests list

@@ -2,7 +2,7 @@
 
 import { useQuery } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
-import { memo, useMemo } from 'react'
+import { memo } from 'react'
 import { Tabs, Card, Badge, Spin, Collapse, Typography } from 'antd'
 import {
   MessageSquare,
@@ -13,7 +13,6 @@ import {
   Clock,
   Hash,
 } from 'lucide-react'
-import { RequestResponse } from '@/app/(protected)/requests/page'
 import HeadersTable from './HeadersTable'
 import ChatView from './ChatView'
 import ToolDeclarationView from './ToolDeclarationView'
@@ -22,11 +21,13 @@ import SmartContentView from './SmartContentView'
 import { LlmRequest } from '@/lib/route-types'
 import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
 import { getProviderByName } from '@/lib/format'
+import axios from 'axios'
 
 const { Text } = Typography
 
 interface RequestViewProps {
-  selectedRequest: RequestResponse
+  requestId: string
+  workspaceId?: string
 }
 
 // Memoized Chat Tab Component
@@ -47,7 +48,7 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
   }
 
   const { conversation } = llmRequest
-  const collapseItems = []
+  const collapseItems: any[] = []
 
   if (conversation.modelMessages && conversation.modelMessages.length > 0) {
     collapseItems.push({
@@ -124,7 +125,7 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
 ChatTab.displayName = 'ChatTab'
 
 // Memoized Request Tab Component
-const RequestTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: RequestResponse, llmRequest: LlmRequest }) => {
+const RequestTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
   const collapseItems = [
     {
       key: 'headers',
@@ -134,15 +135,15 @@ const RequestTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Req
           <span className="font-medium">Headers</span>
         </div>
       ),
-      extra: selectedRequest.requestHeaders && (
+      extra: llmRequest?.rawRequest?.headers && (
         <Badge
-          count={Object.keys(selectedRequest.requestHeaders).length}
+          count={Object.keys(llmRequest.rawRequest.headers).length}
           style={{ backgroundColor: '#1890ff' }}
         />
       ),
       children: (
         <Card className="bg-gray-50 border-0">
-          <HeadersTable headers={selectedRequest.requestHeaders} />
+          <HeadersTable headers={llmRequest?.rawRequest?.headers} />
         </Card>
       ),
     },
@@ -154,14 +155,14 @@ const RequestTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Req
           <span className="font-medium">Request Body</span>
         </div>
       ),
-      extra: selectedRequest.requestHeaders?.['content-type'] && (
+      extra: llmRequest?.rawRequest?.headers?.['content-type'] && (
         <Text code className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
-          {selectedRequest.requestHeaders['content-type']}
+          {llmRequest.rawRequest.headers['content-type']}
         </Text>
       ),
-      children: llmRequest?.rawRequest ? (
+      children: llmRequest?.rawRequest?.body ? (
         <Card className="bg-gray-50 border-0">
-          <SmartContentView data={llmRequest.rawRequest} />
+          <SmartContentView data={llmRequest.rawRequest.body} />
         </Card>
       ) : (
         <div className="flex justify-center py-8">
@@ -185,7 +186,7 @@ const RequestTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Req
 RequestTab.displayName = 'RequestTab'
 
 // Memoized Response Tab Component
-const ResponseTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: RequestResponse, llmRequest: LlmRequest }) => {
+const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
   const collapseItems = [
     {
       key: 'headers',
@@ -195,15 +196,15 @@ const ResponseTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Re
           <span className="font-medium">Headers</span>
         </div>
       ),
-      extra: selectedRequest.responseHeaders && (
+      extra: llmRequest?.rawResponse?.headers && (
         <Badge
-          count={Object.keys(selectedRequest.responseHeaders).length}
+          count={Object.keys(llmRequest.rawResponse.headers).length}
           style={{ backgroundColor: '#1890ff' }}
         />
       ),
       children: (
         <Card className="bg-gray-50 border-0">
-          <HeadersTable headers={selectedRequest.responseHeaders} />
+          <HeadersTable headers={llmRequest?.rawResponse?.headers} />
         </Card>
       ),
     },
@@ -215,14 +216,14 @@ const ResponseTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Re
           <span className="font-medium">Response Body</span>
         </div>
       ),
-      extra: selectedRequest.responseHeaders?.['content-type'] && (
+      extra: llmRequest?.rawResponse?.headers?.['content-type'] && (
         <Text code className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">
-          {selectedRequest.responseHeaders['content-type']}
+          {llmRequest.rawResponse.headers['content-type']}
         </Text>
       ),
-      children: llmRequest?.rawResponse ? (
+      children: llmRequest?.rawResponse?.body ? (
         <Card className="bg-gray-50 border-0">
-          <SmartContentView data={llmRequest.rawResponse} />
+          <SmartContentView data={llmRequest.rawResponse.body} />
         </Card>
       ) : (
         <div className="flex justify-center py-8">
@@ -233,8 +234,8 @@ const ResponseTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Re
   ]
 
   // Add SSE reconstruction if response is SSE
-  if (isSSEResponse(selectedRequest.responseHeaders)) {
-    const events = parseSSEEvents(llmRequest.rawResponse)
+  if (isSSEResponse(llmRequest?.rawResponse?.headers)) {
+    const events = parseSSEEvents(llmRequest.rawResponse.body)
     let eventsToDisplay
     if (llmRequest.provider) {
       const provider = getProviderByName(llmRequest.provider)
@@ -282,7 +283,7 @@ const ResponseTab = memo(({ selectedRequest, llmRequest }: { selectedRequest: Re
 })
 ResponseTab.displayName = 'ResponseTab'
 
-export default function RequestView({ selectedRequest }: RequestViewProps) {
+export default function RequestView({ requestId, workspaceId }: RequestViewProps) {
   const searchParams = useSearchParams()
 
   // Get tab from URL params, default to 'chat'
@@ -292,13 +293,18 @@ export default function RequestView({ selectedRequest }: RequestViewProps) {
 
   // Fetch combined data (request, response, and conversation)
   const { data: combinedData, isLoading } = useQuery({
-    queryKey: ['body', selectedRequest.id, 'combined'],
+    queryKey: ['body', requestId, 'combined'],
     queryFn: async () => {
-      const response = await fetch(`/api/body?id=${selectedRequest.id}`)
-      if (!response.ok) throw new Error('Failed to fetch data')
-      return response.json()
+      const config = workspaceId ? {
+        params: { id: requestId },
+        headers: { 'X-Workspace-Id': workspaceId }
+      } : {
+        params: { id: requestId }
+      }
+      const response = await axios.get('/api/body', config)
+      return response.data
     },
-    enabled: !!selectedRequest,
+    enabled: !!requestId,
   })
 
   const handleTabChange = (key: string) => {
@@ -344,7 +350,7 @@ export default function RequestView({ selectedRequest }: RequestViewProps) {
       ),
       children: (
         <div style={{ display: currentTab === 'request' ? 'block' : 'none' }}>
-          <RequestTab selectedRequest={selectedRequest} llmRequest={combinedData} />
+          <RequestTab llmRequest={combinedData} />
         </div>
       ),
     },
@@ -358,14 +364,14 @@ export default function RequestView({ selectedRequest }: RequestViewProps) {
       ),
       children: (
         <div style={{ display: currentTab === 'response' ? 'block' : 'none' }}>
-          <ResponseTab selectedRequest={selectedRequest} llmRequest={combinedData} />
+          <ResponseTab llmRequest={combinedData} />
         </div>
       ),
     },
   ]
 
   return (
-    <div className="bg-white rounded-lg ">
+    <div className="">
       <Tabs
         activeKey={currentTab}
         onChange={handleTabChange}

@@ -2,16 +2,16 @@
 
 import AuthGuard from "@/components/AuthGuard";
 import Logo from "@/components/Logo";
-import { useRouter, usePathname } from 'next/navigation';
+import { usePathname, useParams } from 'next/navigation';
 import { signOut, useSession } from 'next-auth/react';
-import { Button, Dropdown } from 'antd';
+import { Button } from 'antd';
 import {
   Activity,
   Network,
-  Settings,
   LogOut,
   User,
-  ChevronDown
+  ChevronDown,
+  Key
 } from 'lucide-react';
 import { useState } from 'react';
 import Link from 'next/link';
@@ -98,20 +98,25 @@ export default function ProtectedAuthLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const router = useRouter();
   const pathname = usePathname();
+  const params = useParams();
   const { data: session } = useSession();
 
+
   const isActive = (path: string) => {
-    if (path === '/requests') {
-      return pathname === '/requests' || pathname === '/';
+    if (path === 'requests') {
+      return pathname === `/${params.workspace}/requests` || pathname === '/';
     }
-    return pathname.startsWith(path);
+    if (path === 'api keys') {
+      return pathname.includes(`/${params.workspace}/keys`);
+    }
+    return pathname.includes(`/${params.workspace}/${path}`);
   };
 
   const navItems = [
-    { href: '/requests', icon: Activity, label: 'Requests' },
-    { href: '/upstreams', icon: Network, label: 'Upstreams' },
+    { href: `/${params.workspace}/requests`, icon: Activity, label: 'Requests' },
+    { href: `/${params.workspace}/upstreams`, icon: Network, label: 'Upstreams' },
+    { href: `/${params.workspace}/keys`, icon: Key, label: 'API Keys' },
   ];
 
   return (
@@ -137,7 +142,7 @@ export default function ProtectedAuthLayout({
                     href={item.href}
                     icon={item.icon}
                     label={item.label}
-                    isActive={isActive(item.href)}
+                    isActive={isActive(item.label.toLowerCase())}
                   />
                 ))}
               </nav>

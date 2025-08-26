@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod/v4';
 
-type RouteHandler = (request: NextRequest) => Promise<Response | any>;
+type RouteHandler = (request: NextRequest, ...other: any[] ) => Promise<Response | any>;
 
 export class HttpError extends Error {
   status: number
@@ -17,9 +17,9 @@ export class HttpError extends Error {
 }
 
 export function withError(handler: RouteHandler): RouteHandler {
-  return async (request: NextRequest) => {
+  return async (request: NextRequest, ...args: any[]) => {
     try {
-      const result = await handler(request)
+      const result = await handler(request, ...args)
       if (result instanceof Response) {
         return result
       } else if (result === undefined) {

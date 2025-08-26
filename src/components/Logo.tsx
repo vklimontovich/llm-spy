@@ -1,4 +1,5 @@
 import Link from 'next/link'
+import Image from 'next/image'
 
 interface LogoProps {
   href?: string
@@ -8,8 +9,14 @@ interface LogoProps {
 export default function Logo({ href = '/', className = '' }: LogoProps) {
   return (
     <Link href={href} className={`inline-flex items-center gap-2 group ${className}`}>
-      <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center shadow-lg group-hover:shadow-xl transition-shadow">
-        <span className="text-white font-bold text-sm">LS</span>
+      <div className="w-8 h-8 relative group-hover:scale-110 transition-transform">
+        <Image 
+          src="/icon.svg" 
+          alt="LLM SPY Logo" 
+          width={32} 
+          height={32}
+          className="w-full h-full"
+        />
       </div>
       <span className="text-xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
         LLM SPY

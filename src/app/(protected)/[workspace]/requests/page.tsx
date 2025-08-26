@@ -3,12 +3,14 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Table, Button, Switch } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import {  useState, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import RequestDetails from '@/components/RequestDetails'
 import { extractSessionId } from '@/lib/session-utils'
 import { RefreshCw } from 'lucide-react'
 import styles from './page.module.css'
+import { useWorkspaceApi } from '@/lib/api'
+import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const PAGE_SIZE = 100
 
@@ -37,27 +39,27 @@ export default function RequestsPage() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
+  const api = useWorkspaceApi()
+  const { workspace } = useWorkspace()
 
   const {
     data,
     isLoading,
     error,
-    refetch
+    refetch,
   } = useQuery({
     queryKey: ['requests', offset],
     queryFn: async () => {
-      const url = new URL('/api/requests', window.location.origin)
-      url.searchParams.set('limit', PAGE_SIZE.toString())
-      url.searchParams.set('offset', offset.toString())
-
-      const response = await fetch(url.toString())
-      if (!response.ok) {
-        throw new Error('Failed to fetch requests')
-      }
-      const result = await response.json()
+      const response = await api.get('/requests', {
+        params: {
+          limit: PAGE_SIZE,
+          offset: offset,
+        },
+      })
+      const result = response.data
       setHasMore(result.items && result.items.length === PAGE_SIZE)
       return result
-    }
+    },
   })
 
   // Update last refreshed when data changes
@@ -117,7 +119,7 @@ export default function RequestsPage() {
         params.set('tab', tabKey)
       }
     }
-    const newUrl = params.toString() ? `/requests?${params.toString()}` : '/requests'
+    const newUrl = params.toString() ? `/${workspace.slug}/requests?${params.toString()}` : `/${workspace.slug}/requests`
     router.push(newUrl, { scroll: false })
   }
 
@@ -158,7 +160,7 @@ export default function RequestsPage() {
     const secondsFormatted = String(date.getUTCSeconds()).padStart(2, '0')
     return {
       full: `${year}-${month}-${day} ${hoursFormatted}:${minutesFormatted}:${secondsFormatted} UTC`,
-      ago: timeAgo
+      ago: timeAgo,
     }
   }
 
@@ -177,7 +179,7 @@ export default function RequestsPage() {
             {formatted.full} <span className="text-gray-500">({formatted.ago})</span>
           </span>
         )
-      }
+      },
     },
     {
       title: 'Method',
@@ -187,14 +189,14 @@ export default function RequestsPage() {
       render: (method) => (
         <span className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
           method === 'GET' ? 'bg-green-100 text-green-800' :
-          method === 'POST' ? 'bg-blue-100 text-blue-800' :
-          method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-          method === 'DELETE' ? 'bg-red-100 text-red-800' :
-          'bg-gray-100 text-gray-800'
+            method === 'POST' ? 'bg-blue-100 text-blue-800' :
+              method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
+                method === 'DELETE' ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
         }`}>
           {method}
         </span>
-      )
+      ),
     },
     {
       title: 'Status',
@@ -204,14 +206,14 @@ export default function RequestsPage() {
       render: (status) => (
         <span className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
           status >= 200 && status < 300 ? 'bg-green-100 text-green-800' :
-          status >= 300 && status < 400 ? 'bg-blue-100 text-blue-800' :
-          status >= 400 && status < 500 ? 'bg-yellow-100 text-yellow-800' :
-          status >= 500 ? 'bg-red-100 text-red-800' :
-          'bg-gray-100 text-gray-800'
+            status >= 300 && status < 400 ? 'bg-blue-100 text-blue-800' :
+              status >= 400 && status < 500 ? 'bg-yellow-100 text-yellow-800' :
+                status >= 500 ? 'bg-red-100 text-red-800' :
+                  'bg-gray-100 text-gray-800'
         }`}>
           {status}
         </span>
-      )
+      ),
     },
     {
       title: 'Session',
@@ -228,7 +230,7 @@ export default function RequestsPage() {
             {shortId}
           </span>
         )
-      }
+      },
     },
     {
       title: 'URL',
@@ -238,7 +240,7 @@ export default function RequestsPage() {
         <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block max-w-xs">
           {url}
         </span>
-      )
+      ),
     },
     {
       title: 'Response Type',
@@ -249,7 +251,7 @@ export default function RequestsPage() {
         <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block">
           {contentType || '-'}
         </span>
-      )
+      ),
     },
     {
       title: 'Req Size',
@@ -260,7 +262,7 @@ export default function RequestsPage() {
         <span className="text-xs whitespace-nowrap">
           {formatBytes(bytes)}
         </span>
-      )
+      ),
     },
     {
       title: 'Resp Size',
@@ -271,8 +273,8 @@ export default function RequestsPage() {
         <span className="text-xs whitespace-nowrap">
           {formatBytes(bytes)}
         </span>
-      )
-    }
+      ),
+    },
   ]
 
   if (error) {
@@ -337,7 +339,7 @@ export default function RequestsPage() {
                 setSelectedRequest(record)
                 updateUrl(record.id, 'chat')
               },
-              style: { cursor: 'pointer' }
+              style: { cursor: 'pointer' },
             })}
           />
           {hasMore && (
