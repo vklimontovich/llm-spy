@@ -17,34 +17,34 @@ export async function DELETE(
     // Find workspace and verify user has admin/owner access
     const workspace = await prisma.workspace.findFirst({
       where: {
-        OR: [
-          { id: workspaceIdOrSlug },
-          { slug: workspaceIdOrSlug }
-        ],
+        OR: [{ id: workspaceIdOrSlug }, { slug: workspaceIdOrSlug }],
         users: {
           some: {
             user: {
-              email: session.user.email
+              email: session.user.email,
             },
-            role: { in: ['admin', 'owner'] } // Only admins/owners can delete keys
-          }
-        }
-      }
+            role: { in: ['admin', 'owner'] }, // Only admins/owners can delete keys
+          },
+        },
+      },
     })
 
     if (!workspace) {
-      return NextResponse.json({ error: 'Workspace not found or insufficient permissions' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Workspace not found or insufficient permissions' },
+        { status: 404 }
+      )
     }
 
     // Soft delete the auth key
     await prisma.authKey.update({
       where: {
         id: keyId,
-        workspaceId: workspace.id
+        workspaceId: workspace.id,
       },
       data: {
-        deletedAt: new Date()
-      }
+        deletedAt: new Date(),
+      },
     })
 
     return NextResponse.json({ success: true })

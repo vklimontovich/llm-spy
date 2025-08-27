@@ -31,7 +31,7 @@ export async function GET() {
               backgroundSize: '50px 50px',
             }}
           />
-          
+
           {/* Main content */}
           <div
             style={{
@@ -135,7 +135,11 @@ export async function GET() {
                 marginTop: '20px',
               }}
             >
-              {['Universal Gateway', 'Session Intelligence', 'Real-time Monitoring'].map((feature) => (
+              {[
+                'Universal Gateway',
+                'Session Intelligence',
+                'Real-time Monitoring',
+              ].map(feature => (
                 <div
                   key={feature}
                   style={{
@@ -193,7 +197,7 @@ export async function GET() {
               gap: '8px',
             }}
           >
-            {[1, 2, 3].map((i) => (
+            {[1, 2, 3].map(i => (
               <div
                 key={i}
                 style={{

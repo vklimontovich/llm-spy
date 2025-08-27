@@ -2,8 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { useParams } from 'next/navigation'
-import { Button, Table, Modal, message, Typography, Alert, Space, Tag } from 'antd'
-import { Plus, Trash2, Copy, Key, Eye, EyeOff } from 'lucide-react'
+import {
+  Button,
+  Table,
+  Modal,
+  message,
+  Typography,
+  Alert,
+  Space,
+  Tag,
+} from 'antd'
+import { Plus, Trash2, Copy, Eye, EyeOff } from 'lucide-react'
 import { useWorkspaceApi } from '@/lib/api'
 
 const { Text, Title, Paragraph } = Typography
@@ -61,7 +70,8 @@ export function KeyList() {
   const deleteKey = async (keyId: string) => {
     Modal.confirm({
       title: 'Delete API Key',
-      content: 'Are you sure you want to delete this API key? This action cannot be undone.',
+      content:
+        'Are you sure you want to delete this API key? This action cannot be undone.',
       okText: 'Delete',
       okType: 'danger',
       onOk: async () => {
@@ -71,15 +81,17 @@ export function KeyList() {
           message.success('API key deleted successfully')
         } catch (error: any) {
           console.error('Error deleting key:', error)
-          message.error(error.response?.data?.error || 'Failed to delete API key')
+          message.error(
+            error.response?.data?.error || 'Failed to delete API key'
+          )
         }
-      }
+      },
     })
   }
 
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
-    message.success('API key copied to clipboard')
+    message.success('Copied to clipboard', 2)
   }
 
   const toggleKeyVisibility = (keyId: string) => {
@@ -101,7 +113,9 @@ export function KeyList() {
       key: 'id',
       width: 250,
       render: (id: string) => (
-        <Text code className="text-xs whitespace-nowrap">{id}</Text>
+        <Text code className="text-xs whitespace-nowrap">
+          {id}
+        </Text>
       ),
     },
     {
@@ -110,20 +124,21 @@ export function KeyList() {
       key: 'key',
       render: (key: string, record: AuthKey) => (
         <Space>
-          <Key className="w-4 h-4 text-gray-400" />
           <Text code className="text-xs">
-            {record.hashed || !visibleKeys.has(record.id) ? 
-              '••••••••••••••••••••••••••••••••••••••••••••••••••••••••' : 
-              key
-            }
+            {record.hashed || !visibleKeys.has(record.id)
+              ? '•'.repeat(key.length)
+              : key}
           </Text>
           {!record.hashed && (
             <Button
               size="small"
               type="text"
-              icon={visibleKeys.has(record.id) ? 
-                <EyeOff className="w-3 h-3" /> : 
-                <Eye className="w-3 h-3" />
+              icon={
+                visibleKeys.has(record.id) ? (
+                  <EyeOff className="w-3 h-3" />
+                ) : (
+                  <Eye className="w-3 h-3" />
+                )
               }
               onClick={() => toggleKeyVisibility(record.id)}
             />
@@ -191,7 +206,8 @@ export function KeyList() {
         loading={loading}
         pagination={false}
         locale={{
-          emptyText: 'No API keys yet. Create your first API key to get started.'
+          emptyText:
+            'No API keys yet. Create your first API key to get started.',
         }}
       />
 
@@ -203,21 +219,32 @@ export function KeyList() {
           setNewKey(null)
         }}
         footer={
-          newKey ? [
-            <Button key="done" type="primary" onClick={() => {
-              setModalOpen(false)
-              setNewKey(null)
-            }}>
-              Done
-            </Button>
-          ] : [
-            <Button key="cancel" onClick={() => setModalOpen(false)}>
-              Cancel
-            </Button>,
-            <Button key="create" type="primary" loading={creating} onClick={createKey}>
-              Create Key
-            </Button>
-          ]
+          newKey
+            ? [
+                <Button
+                  key="done"
+                  type="primary"
+                  onClick={() => {
+                    setModalOpen(false)
+                    setNewKey(null)
+                  }}
+                >
+                  Done
+                </Button>,
+              ]
+            : [
+                <Button key="cancel" onClick={() => setModalOpen(false)}>
+                  Cancel
+                </Button>,
+                <Button
+                  key="create"
+                  type="primary"
+                  loading={creating}
+                  onClick={createKey}
+                >
+                  Create Key
+                </Button>,
+              ]
         }
       >
         {newKey ? (
@@ -228,7 +255,7 @@ export function KeyList() {
               type="warning"
               showIcon
             />
-            
+
             <div>
               <Text strong>Your new API key:</Text>
               <div className="mt-2 p-3 bg-gray-50 rounded-lg flex items-center gap-2">
@@ -239,13 +266,15 @@ export function KeyList() {
                   size="small"
                   icon={<Copy className="w-4 h-4" />}
                   onClick={() => copyToClipboard(newKey)}
+                  style={{ border: 'none', boxShadow: 'none' }}
                 />
               </div>
             </div>
           </Space>
         ) : (
           <Paragraph>
-            Create a new API key for this workspace. Make sure to copy it - you won&apos;t be able to see it again.
+            Create a new API key for this workspace. Make sure to copy it - you
+            won&apos;t be able to see it again.
           </Paragraph>
         )}
       </Modal>

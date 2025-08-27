@@ -20,8 +20,8 @@ export default function SignInClient() {
       <div className="flex-1 flex flex-col justify-center px-8 sm:px-12 lg:px-16 xl:px-24 bg-white">
         <div className="w-full max-w-sm mx-auto">
           {/* Back Link */}
-          <Link 
-            href="/" 
+          <Link
+            href="/"
             className="inline-flex items-center gap-2 text-sm text-gray-600 hover:text-gray-900 transition-colors group mb-8"
           >
             <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />
@@ -38,9 +38,7 @@ export default function SignInClient() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2">
               {copy.signin.title}
             </h1>
-            <p className="text-gray-600">
-              {copy.signin.subtitle}
-            </p>
+            <p className="text-gray-600">{copy.signin.subtitle}</p>
           </div>
 
           {/* Google Sign In Button */}
@@ -153,7 +151,9 @@ export default function SignInClient() {
           <div className="mt-12 p-6 bg-white/10 backdrop-blur rounded-xl border border-white/20">
             <div className="flex items-center gap-2 mb-3">
               <CheckCircle className="w-5 h-5 text-green-400" />
-              <span className="text-white font-semibold">{copy.signin.rightPanel.quickSetup.title}</span>
+              <span className="text-white font-semibold">
+                {copy.signin.rightPanel.quickSetup.title}
+              </span>
             </div>
             <code className="block text-sm text-blue-100 font-mono">
               {copy.signin.rightPanel.quickSetup.code}

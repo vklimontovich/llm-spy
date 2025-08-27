@@ -1,13 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { ZodError } from 'zod/v4';
+import { ZodError } from 'zod/v4'
 
-type RouteHandler = (request: NextRequest, ...other: any[] ) => Promise<Response | any>;
+type RouteHandler = (
+  request: NextRequest,
+  ...other: any[]
+) => Promise<Response | any>
 
 export class HttpError extends Error {
   status: number
   cause?: unknown
 
-  constructor(status: number, message?: string, { cause }: { cause?: unknown } = {}) {
+  constructor(
+    status: number,
+    message?: string,
+    { cause }: { cause?: unknown } = {}
+  ) {
     super(message, cause ? { cause } : undefined)
     this.status = status
     this.name = 'HttpError'
@@ -35,7 +42,7 @@ export function withError(handler: RouteHandler): RouteHandler {
             error: error.message || 'An error occurred',
             details: error.cause ? String(error.cause) : undefined,
           },
-          { status: error.status },
+          { status: error.status }
         )
       } else if (error instanceof ZodError) {
         return NextResponse.json(
@@ -43,7 +50,7 @@ export function withError(handler: RouteHandler): RouteHandler {
             error: 'Invalid request - zod error',
             issues: error.issues,
           },
-          { status: 400 },
+          { status: 400 }
         )
       }
       return NextResponse.json(
@@ -51,7 +58,7 @@ export function withError(handler: RouteHandler): RouteHandler {
           error: 'Internal server error',
           details: error instanceof Error ? error.message : String(error),
         },
-        { status: 500 },
+        { status: 500 }
       )
     }
   }

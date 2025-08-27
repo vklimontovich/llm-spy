@@ -15,16 +15,16 @@ export async function redirectToWorkspace(session: Session | null) {
     include: {
       workspaces: {
         include: {
-          workspace: true
-        }
-      }
-    }
+          workspace: true,
+        },
+      },
+    },
   })
 
   if (!user) {
     // User doesn't exist, create them first
     const newUser = await prisma.user.create({
-      data: { email: session.user.email }
+      data: { email: session.user.email },
     })
 
     // Create a default workspace for the new user
@@ -36,10 +36,10 @@ export async function redirectToWorkspace(session: Session | null) {
         users: {
           create: {
             userId: newUser.id,
-            role: 'owner'
-          }
-        }
-      }
+            role: 'owner',
+          },
+        },
+      },
     })
 
     redirect(`/${workspace.slug}/upstreams`)
@@ -55,10 +55,10 @@ export async function redirectToWorkspace(session: Session | null) {
         users: {
           create: {
             userId: user.id,
-            role: 'owner'
-          }
-        }
-      }
+            role: 'owner',
+          },
+        },
+      },
     })
 
     redirect(`/${workspace.slug}/upstreams`)

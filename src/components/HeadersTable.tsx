@@ -16,7 +16,7 @@ export default function HeadersTable({ headers }: HeadersTableProps) {
   const headerData = Object.entries(headers).map(([key, value], index) => ({
     key: index,
     name: key,
-    value: String(value)
+    value: String(value),
   }))
 
   const columns = [
@@ -25,14 +25,14 @@ export default function HeadersTable({ headers }: HeadersTableProps) {
       dataIndex: 'name',
       key: 'name',
       width: '30%',
-      className: 'whitespace-nowrap'
+      className: 'whitespace-nowrap',
     },
     {
       title: 'Value',
       dataIndex: 'value',
       key: 'value',
-      width: '70%'
-    }
+      width: '70%',
+    },
   ]
 
   return (

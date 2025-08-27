@@ -8,11 +8,11 @@ import LoadingScreen from '@/components/LoadingScreen'
 import axios from 'axios'
 
 export default function AuthGuard({ children }: { children: React.ReactNode }) {
-  return <SessionProvider>
-    <AuthGuard0>
-      {children}
-    </AuthGuard0>
-  </SessionProvider>
+  return (
+    <SessionProvider>
+      <AuthGuard0>{children}</AuthGuard0>
+    </SessionProvider>
+  )
 }
 
 function AuthGuard0({ children }: { children: React.ReactNode }) {
@@ -21,7 +21,12 @@ function AuthGuard0({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const params = useParams()
   const [redirect, setRedirect] = useState<string>()
-  const [workspace, setWorkspace] = useState<{ id: string, slug: string, name: string, role?: string } | null>(null)
+  const [workspace, setWorkspace] = useState<{
+    id: string
+    slug: string
+    name: string
+    role?: string
+  } | null>(null)
   const [workspaceLoaded, setWorkspaceLoaded] = useState(false)
   const [error, setError] = useState<string | null>(null)
   console.log('pathname', pathname)
@@ -42,14 +47,18 @@ function AuthGuard0({ children }: { children: React.ReactNode }) {
       if (params.workspace && typeof params.workspace === 'string') {
         setError(null)
 
-        axios.get(`/api/workspaces/${params.workspace}`)
+        axios
+          .get(`/api/workspaces/${params.workspace}`)
           .then(response => {
             setWorkspace(response.data)
             setWorkspaceLoaded(true)
           })
           .catch(error => {
             setError(error.response?.data?.error || 'Failed to fetch workspace')
-            console.error(`Failed to fetch workspace ${params.workspace}`, error)
+            console.error(
+              `Failed to fetch workspace ${params.workspace}`,
+              error
+            )
           })
       } else {
         setWorkspaceLoaded(true)
@@ -68,10 +77,10 @@ function AuthGuard0({ children }: { children: React.ReactNode }) {
       </div>
     )
   } else {
-    return (
-      workspace ? <WorkspaceProvider workspace={workspace}>
-        {children}
-      </WorkspaceProvider> : <>{children}</>
+    return workspace ? (
+      <WorkspaceProvider workspace={workspace}>{children}</WorkspaceProvider>
+    ) : (
+      <>{children}</>
     )
   }
 }

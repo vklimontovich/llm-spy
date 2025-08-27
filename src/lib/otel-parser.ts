@@ -1,13 +1,27 @@
-import type { ParsedAttributeValue, ParsedSpan, ParsedTraces } from './format/otel-types'
-export { ParsedTracesSchema, type LLMAttributes, type GenAIAttributes, type ParsedSpan, type ParsedTraces } from './format/otel-types'
+import type {
+  ParsedAttributeValue,
+  ParsedSpan,
+  ParsedTraces,
+} from './format/otel-types'
+export {
+  ParsedTracesSchema,
+  type LLMAttributes,
+  type GenAIAttributes,
+  type ParsedSpan,
+  type ParsedTraces,
+} from './format/otel-types'
 
 // Helper function to extract attribute value from OTEL format
 function extractAttributeValue(value: any): ParsedAttributeValue {
   if (value.stringValue !== undefined) return value.stringValue
-  if (value.intValue !== undefined) return typeof value.intValue === 'string' ? parseInt(value.intValue) : value.intValue
+  if (value.intValue !== undefined)
+    return typeof value.intValue === 'string'
+      ? parseInt(value.intValue)
+      : value.intValue
   if (value.doubleValue !== undefined) return value.doubleValue
   if (value.boolValue !== undefined) return value.boolValue
-  if (value.arrayValue?.values) return value.arrayValue.values.map((v: any) => extractAttributeValue(v))
+  if (value.arrayValue?.values)
+    return value.arrayValue.values.map((v: any) => extractAttributeValue(v))
   if (value.kvlistValue?.values) {
     const obj: Record<string, any> = {}
     value.kvlistValue.values.forEach((kv: any) => {
@@ -20,7 +34,9 @@ function extractAttributeValue(value: any): ParsedAttributeValue {
 }
 
 // Helper to convert dot notation to nested object
-function dotNotationToObject(attributes: Record<string, ParsedAttributeValue>): Record<string, any> {
+function dotNotationToObject(
+  attributes: Record<string, ParsedAttributeValue>
+): Record<string, any> {
   const result: Record<string, any> = {}
 
   for (const [key, value] of Object.entries(attributes)) {
@@ -136,12 +152,14 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
           spanId: span.spanId || '',
           parentSpanId: span.parentSpanId,
           kind: span.kind,
-          startTime: typeof span.startTimeUnixNano === 'string'
-            ? parseInt(span.startTimeUnixNano)
-            : span.startTimeUnixNano || 0,
-          endTime: typeof span.endTimeUnixNano === 'string'
-            ? parseInt(span.endTimeUnixNano)
-            : span.endTimeUnixNano || 0,
+          startTime:
+            typeof span.startTimeUnixNano === 'string'
+              ? parseInt(span.startTimeUnixNano)
+              : span.startTimeUnixNano || 0,
+          endTime:
+            typeof span.endTimeUnixNano === 'string'
+              ? parseInt(span.endTimeUnixNano)
+              : span.endTimeUnixNano || 0,
           duration: 0, // Will calculate below
           status: span.status,
           attributes: nestedAttributes,
@@ -149,11 +167,12 @@ export function parseOtelTrace(data: string | object): ParsedTraces {
           ...(llmAttributes && { llm: llmAttributes }),
           ...(genAiAttributes && { gen_ai: genAiAttributes }),
           // Flatten resource attributes to top level
-          ...resourceNested
+          ...resourceNested,
         }
 
         // Calculate duration in milliseconds
-        parsedSpan.duration = (parsedSpan.endTime - parsedSpan.startTime) / 1_000_000
+        parsedSpan.duration =
+          (parsedSpan.endTime - parsedSpan.startTime) / 1_000_000
 
         parsedSpans.push(parsedSpan)
       }
@@ -180,6 +199,6 @@ export function otelSpansToToolDeclarations(spans: ParsedSpan[]): any[] {
   return model.tools.map(t => ({
     name: (t as any).name || 'unknown',
     description: t.description,
-    parameters: t.inputSchema
+    parameters: t.inputSchema,
   }))
 }

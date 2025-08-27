@@ -14,19 +14,19 @@ export default function LoadingScreen() {
               <Skeleton.Button active size="small" shape="square" />
               <Skeleton.Button active size="small" />
             </div>
-            
+
             {/* Navigation skeleton */}
             <div className="flex items-center gap-2">
               <Skeleton.Button active />
               <Skeleton.Button active />
             </div>
-            
+
             {/* User menu skeleton */}
             <Skeleton.Avatar active size="default" />
           </div>
         </div>
       </header>
-      
+
       {/* Main content skeleton */}
       <main className="w-full min-w-[1024px]">
         <div className="max-w-[1900px] mx-auto p-6">

@@ -14,12 +14,12 @@ export default function UpstreamEditPage() {
           {id === 'new' ? 'Create Upstream' : 'Edit Upstream'}
         </h1>
         <p className="text-gray-600">
-          {id === 'new' 
-            ? 'Configure a new upstream proxy destination' 
+          {id === 'new'
+            ? 'Configure a new upstream proxy destination'
             : 'Update upstream configuration and OpenTelemetry collectors'}
         </p>
       </div>
-      
+
       <UpstreamEditor id={id} />
     </div>
   )

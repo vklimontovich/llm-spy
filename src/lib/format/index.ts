@@ -1,4 +1,9 @@
-export { anthropicToModel, AnthropicWireSchema, type AnthropicWire, AnthropicParser } from './anthropic'
+export {
+  anthropicToModel,
+  AnthropicWireSchema,
+  type AnthropicWire,
+  AnthropicParser,
+} from './anthropic'
 export type { ConversationModel, ProviderParser } from './model'
 
 import { AnthropicParser } from './anthropic'
@@ -9,7 +14,9 @@ import type { ProviderParser } from './model'
  * @param payloadUnknown - The request payload to analyze
  * @returns A ProviderParser instance or undefined if no matching parser found
  */
-export function getProvider(payloadUnknown: unknown): ProviderParser | undefined {
+export function getProvider(
+  payloadUnknown: unknown
+): ProviderParser | undefined {
   if (!payloadUnknown || typeof payloadUnknown !== 'object') {
     return undefined
   }
@@ -25,11 +32,14 @@ export function getProvider(payloadUnknown: unknown): ProviderParser | undefined
 
     // Additional check for Anthropic structure
     if (Array.isArray(payload.messages)) {
-      const hasAnthropicStructure = payload.messages.some((msg: any) =>
-        msg?.content && Array.isArray(msg.content) &&
-        msg.content.some((part: any) =>
-          part?.type === 'tool_use' || part?.type === 'tool_result',
-        ),
+      const hasAnthropicStructure = payload.messages.some(
+        (msg: any) =>
+          msg?.content &&
+          Array.isArray(msg.content) &&
+          msg.content.some(
+            (part: any) =>
+              part?.type === 'tool_use' || part?.type === 'tool_result'
+          )
       )
       if (hasAnthropicStructure) {
         return new AnthropicParser()

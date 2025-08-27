@@ -3,7 +3,7 @@ import { z } from 'zod'
 export const HeaderSchema = z.object({
   name: z.string(),
   value: z.string(),
-  priority: z.enum(['low', 'high']).default('low')
+  priority: z.enum(['low', 'high']).default('low'),
 })
 
 export const UpstreamSchema = z.object({
@@ -13,11 +13,15 @@ export const UpstreamSchema = z.object({
   headers: z.array(HeaderSchema).default([]),
   inputFormat: z.enum(['auto', 'anthropic', 'openai', 'otel']).default('auto'),
   outputFormat: z.enum(['anthropic', 'openai']).nullable().default(null),
-  otelUpstreams: z.array(z.object({
-    id: z.string().optional(),
-    url: z.string(),
-    headers: z.array(HeaderSchema).default([])
-  })).default([])
+  otelUpstreams: z
+    .array(
+      z.object({
+        id: z.string().optional(),
+        url: z.string(),
+        headers: z.array(HeaderSchema).default([]),
+      })
+    )
+    .default([]),
 })
 
 export type Header = z.infer<typeof HeaderSchema>

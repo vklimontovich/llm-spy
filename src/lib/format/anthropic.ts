@@ -1,5 +1,5 @@
-import { z } from 'zod';
-import type { Tool, ModelMessage } from 'ai';
+import { z } from 'zod'
+import type { Tool, ModelMessage } from 'ai'
 import type { ConversationModel, ProviderParser } from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
@@ -10,72 +10,77 @@ import type { SSEEvent } from '@/lib/sse-utils'
 const AnthropicTextPart = z.object({
   type: z.literal('text'),
   text: z.string(),
-});
+})
 
 const AnthropicToolUsePart = z.object({
   type: z.literal('tool_use'),
   id: z.string().optional(),
   name: z.string(),
   input: z.unknown(),
-});
+})
 
 const AnthropicToolResultPart = z.object({
   type: z.literal('tool_result'),
   tool_use_id: z.string(),
   content: z.unknown().optional(), // string | [{type:'text',text}] | any
   is_error: z.boolean().optional(),
-});
+})
 
 const AnthropicContentPart = z.discriminatedUnion('type', [
   AnthropicTextPart,
   AnthropicToolUsePart,
   AnthropicToolResultPart,
   // add image/file parts here if needed
-]);
+])
 
 const AnthropicMessage = z.object({
   role: z.enum(['user', 'assistant']),
-  content: z.union([
-    z.string(),
-    z.array(AnthropicContentPart)
-  ]),
-});
+  content: z.union([z.string(), z.array(AnthropicContentPart)]),
+})
 
 const AnthropicToolDef = z.object({
   name: z.string(),
   description: z.string().optional(),
   input_schema: z.record(z.string(), z.any()).optional(),
-});
+})
 
 export const AnthropicWireSchema = z.object({
   model: z.string(),
   messages: z.array(AnthropicMessage),
-  system: z.union([
-    z.string(),
-    z.array(z.object({
-      type: z.literal('text'),
-      text: z.string(),
-      cache_control: z.object({
-        type: z.string()
-      }).optional()
-    }))
-  ]).optional(),
+  system: z
+    .union([
+      z.string(),
+      z.array(
+        z.object({
+          type: z.literal('text'),
+          text: z.string(),
+          cache_control: z
+            .object({
+              type: z.string(),
+            })
+            .optional(),
+        })
+      ),
+    ])
+    .optional(),
   tools: z.array(AnthropicToolDef).optional(),
   metadata: z.unknown().optional(),
   max_tokens: z.number().optional(),
   stream: z.boolean().optional(),
-});
+})
 
-export type AnthropicWire = z.infer<typeof AnthropicWireSchema>;
+export type AnthropicWire = z.infer<typeof AnthropicWireSchema>
 
+export function anthropicToModel(
+  payloadUnknown: unknown,
+  responseUnknown?: unknown
+): ConversationModel {
+  const payload = AnthropicWireSchema.parse(payloadUnknown)
 
-export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unknown): ConversationModel {
-  const payload = AnthropicWireSchema.parse(payloadUnknown);
+  const out: ModelMessage[] = []
 
-  const out: ModelMessage[] = [];
-  
   // Track tool calls by ID for name resolution
-  const toolCallMap = new Map<string, string>(); // toolCallId -> toolName
+  const toolCallMap = new Map<string, string>() // toolCallId -> toolName
 
   // 1) Top-level system - handle multiple system messages
   if (payload.system) {
@@ -84,8 +89,8 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
       out.push({
         role: 'system',
         content: payload.system,
-        providerOptions: { originalMessageGroup: '-1' }
-      } as unknown as ModelMessage);
+        providerOptions: { originalMessageGroup: '-1' },
+      } as unknown as ModelMessage)
     } else {
       // Array of system message parts - output each as separate system message
       for (const part of payload.system) {
@@ -95,17 +100,21 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
             content: part.text,
             providerOptions: {
               originalMessageGroup: '-1',
-              ...(part.cache_control && { cache_control: part.cache_control })
-            }
-          } as unknown as ModelMessage);
+              ...(part.cache_control && { cache_control: part.cache_control }),
+            },
+          } as unknown as ModelMessage)
         }
       }
     }
   }
 
   // 2) Messages
-  for (let messageIndex = 0; messageIndex < payload.messages.length; messageIndex++) {
-    const m = payload.messages[messageIndex];
+  for (
+    let messageIndex = 0;
+    messageIndex < payload.messages.length;
+    messageIndex++
+  ) {
+    const m = payload.messages[messageIndex]
 
     // Handle string content (common in user messages)
     if (typeof m.content === 'string') {
@@ -113,83 +122,91 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
         out.push({
           role: 'user',
           content: m.content,
-          providerOptions: { originalMessageGroup: String(messageIndex) }
-        } as unknown as ModelMessage);
+          providerOptions: { originalMessageGroup: String(messageIndex) },
+        } as unknown as ModelMessage)
       } else if (m.role === 'assistant') {
         out.push({
           role: 'assistant',
           content: [{ type: 'text', text: m.content }],
-          providerOptions: { originalMessageGroup: String(messageIndex) }
-        } as unknown as ModelMessage);
+          providerOptions: { originalMessageGroup: String(messageIndex) },
+        } as unknown as ModelMessage)
       }
-      continue;
+      continue
     }
 
-    const parts = Array.isArray(m.content) ? m.content : [];
+    const parts = Array.isArray(m.content) ? m.content : []
 
     // tool_result parts arrive on user turns → map to role:'tool'
-    const toolResults = parts.filter(p => p.type === 'tool_result') as z.infer<typeof AnthropicToolResultPart>[];
+    const toolResults = parts.filter(p => p.type === 'tool_result') as z.infer<
+      typeof AnthropicToolResultPart
+    >[]
     if (toolResults.length) {
       // Tool messages have a different content structure in AI SDK
       for (const tr of toolResults) {
         // Try to find the tool name from previous tool calls
-        const toolName = toolCallMap.get(tr.tool_use_id) || 'unknown';
-        
+        const toolName = toolCallMap.get(tr.tool_use_id) || 'unknown'
+
         out.push({
           role: 'tool',
-          content: [{
-            type: 'tool-result' as const,
-            toolCallId: tr.tool_use_id,
-            toolName,
-            output: normalizeToolResult(tr.content),
-          }],
-          providerOptions: { originalMessageGroup: String(messageIndex) }
-        } as unknown as ModelMessage);
+          content: [
+            {
+              type: 'tool-result' as const,
+              toolCallId: tr.tool_use_id,
+              toolName,
+              output: normalizeToolResult(tr.content),
+            },
+          ],
+          providerOptions: { originalMessageGroup: String(messageIndex) },
+        } as unknown as ModelMessage)
       }
     }
 
-    const textParts = parts.filter(p => p.type === 'text') as z.infer<typeof AnthropicTextPart>[];
+    const textParts = parts.filter(p => p.type === 'text') as z.infer<
+      typeof AnthropicTextPart
+    >[]
 
     if (m.role === 'user') {
       if (textParts.length > 0) {
         const content =
           textParts.length === 1
             ? textParts[0].text // user content can be a string
-            : textParts.map(tp => ({ type: 'text' as const, text: tp.text }));
+            : textParts.map(tp => ({ type: 'text' as const, text: tp.text }))
 
         out.push({
           role: 'user',
           content,
-          providerOptions: { originalMessageGroup: String(messageIndex) }
-        } as unknown as ModelMessage);
+          providerOptions: { originalMessageGroup: String(messageIndex) },
+        } as unknown as ModelMessage)
       }
     } else {
       // assistant: enforce array-of-parts (no bare string) → fixes your type error
-      const toolUses = parts.filter(p => p.type === 'tool_use') as z.infer<typeof AnthropicToolUsePart>[];
+      const toolUses = parts.filter(p => p.type === 'tool_use') as z.infer<
+        typeof AnthropicToolUsePart
+      >[]
 
       const assistantContent: any[] = [
         ...textParts.map(tp => ({ type: 'text' as const, text: tp.text })),
         ...toolUses.map(tu => {
-          const toolCallId = tu.id || `tool-${Date.now()}`;
+          const toolCallId = tu.id || `tool-${Date.now()}`
           // Store the mapping for later tool results
           if (tu.id) {
-            toolCallMap.set(tu.id, tu.name);
+            toolCallMap.set(tu.id, tu.name)
           }
           return {
             type: 'tool-call' as const,
             toolCallId,
             toolName: tu.name,
             args: tu.input,
-          };
+          }
         }),
-      ];
+      ]
 
       if (assistantContent.length > 0) {
         out.push({
           role: 'assistant',
           content: assistantContent,
-          providerOptions: { originalMessageGroup: String(messageIndex) }
-        } as unknown as ModelMessage);
+          providerOptions: { originalMessageGroup: String(messageIndex) },
+        } as unknown as ModelMessage)
       }
     }
   }
@@ -208,12 +225,15 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
       } else if (Array.isArray(response.content)) {
         for (const part of response.content) {
           if (part.type === 'text') {
-            assistantContent.push({ type: 'text' as const, text: part.text || '' })
+            assistantContent.push({
+              type: 'text' as const,
+              text: part.text || '',
+            })
           } else if (part.type === 'tool_use') {
-            const toolCallId = part.id || `tool-${Date.now()}`;
+            const toolCallId = part.id || `tool-${Date.now()}`
             // Store the mapping for later tool results
             if (part.id) {
-              toolCallMap.set(part.id, part.name);
+              toolCallMap.set(part.id, part.name)
             }
             assistantContent.push({
               type: 'tool-call' as const,
@@ -229,18 +249,21 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
         out.push({
           role: 'assistant',
           content: assistantContent,
-          providerOptions: { originalMessageGroup: String(messageIndex) }
+          providerOptions: { originalMessageGroup: String(messageIndex) },
         } as unknown as ModelMessage)
       }
     }
   }
 
   // 4) Tools: map to SDK Tool type (no Zod)
-  const tools: Tool[] = (payload.tools ?? []).map<Tool>(t => ({
-    name: t.name,
-    description: t.description,
-    inputSchema: t.input_schema || {}, // AI SDK uses 'inputSchema'
-  } as Tool));
+  const tools: Tool[] = (payload.tools ?? []).map<Tool>(
+    t =>
+      ({
+        name: t.name,
+        description: t.description,
+        inputSchema: t.input_schema || {}, // AI SDK uses 'inputSchema'
+      }) as Tool
+  )
 
   return {
     modelMessages: out,
@@ -251,76 +274,85 @@ export function anthropicToModel(payloadUnknown: unknown, responseUnknown?: unkn
       stream: payload.stream,
       metadata: payload.metadata,
     },
-  };
+  }
 }
 
 function normalizeToolResult(raw: unknown): unknown {
-  if (typeof raw === 'string') return raw;
+  if (typeof raw === 'string') return raw
   if (Array.isArray(raw)) {
     const text = raw
-      .map(p => (p && typeof p === 'object' && (p as any).type === 'text' ? String((p as any).text ?? '') : ''))
+      .map(p =>
+        p && typeof p === 'object' && (p as any).type === 'text'
+          ? String((p as any).text ?? '')
+          : ''
+      )
       .filter(Boolean)
-      .join('\n');
-    if (text) return text;
+      .join('\n')
+    if (text) return text
   }
-  return raw ?? null;
+  return raw ?? null
 }
 
 /**
  * Parser for Anthropic API format
  */
 export class AnthropicParser implements ProviderParser {
-
   getParserName(): string {
-    return 'anthropic';
+    return 'anthropic'
   }
 
-  createConversation(payloadUnknown: unknown | null, responseUnknown?: unknown): ConversationModel | undefined {
+  createConversation(
+    payloadUnknown: unknown | null,
+    responseUnknown?: unknown
+  ): ConversationModel | undefined {
     try {
       if (payloadUnknown === null && responseUnknown) {
         // When payload is null, create minimal conversation from response only
-        return this.responseToModel(responseUnknown);
+        return this.responseToModel(responseUnknown)
       }
-      return anthropicToModel(payloadUnknown, responseUnknown);
+      return anthropicToModel(payloadUnknown, responseUnknown)
     } catch (error) {
-      console.error('Failed to parse Anthropic conversation:', error);
-      return undefined;
+      console.error('Failed to parse Anthropic conversation:', error)
+      return undefined
     }
   }
 
   private responseToModel(responseUnknown: unknown): ConversationModel {
-    const response = responseUnknown as any;
-    const out: ModelMessage[] = [];
-    
+    const response = responseUnknown as any
+    const out: ModelMessage[] = []
+
     if (response.role === 'assistant' && response.content) {
-      const assistantContent: any[] = [];
-      
+      const assistantContent: any[] = []
+
       if (typeof response.content === 'string') {
-        assistantContent.push({ type: 'text' as const, text: response.content });
+        assistantContent.push({ type: 'text' as const, text: response.content })
       } else if (Array.isArray(response.content)) {
         for (const part of response.content) {
           if (part.type === 'text') {
-            assistantContent.push({ type: 'text' as const, text: part.text || '' });
+            assistantContent.push({
+              type: 'text' as const,
+              text: part.text || '',
+            })
           } else if (part.type === 'tool_use') {
             assistantContent.push({
               type: 'tool-call' as const,
               toolCallId: part.id || `tool-${Date.now()}`,
               toolName: part.name,
               args: part.input,
-            });
+            })
           }
         }
       }
-      
+
       if (assistantContent.length > 0) {
         out.push({
           role: 'assistant',
           content: assistantContent,
-          providerOptions: { originalMessageGroup: '0' }
-        } as unknown as ModelMessage);
+          providerOptions: { originalMessageGroup: '0' },
+        } as unknown as ModelMessage)
       }
     }
-    
+
     return {
       modelMessages: out,
       tools: [],
@@ -328,13 +360,14 @@ export class AnthropicParser implements ProviderParser {
         model: response.model || 'unknown',
         stream: false,
       },
-    };
+    }
   }
 
   toResponse(conversation: ConversationModel): any {
     // Convert ConversationModel back to Anthropic response format
-    const lastMessage = conversation.modelMessages[conversation.modelMessages.length - 1];
-    
+    const lastMessage =
+      conversation.modelMessages[conversation.modelMessages.length - 1]
+
     if (!lastMessage || lastMessage.role !== 'assistant') {
       // Return a minimal assistant response
       return {
@@ -349,28 +382,28 @@ export class AnthropicParser implements ProviderParser {
           input_tokens: 0,
           output_tokens: 0,
         },
-      };
+      }
     }
-    
-    const content: any[] = [];
-    
+
+    const content: any[] = []
+
     if (Array.isArray(lastMessage.content)) {
       for (const part of lastMessage.content) {
         if (part.type === 'text') {
-          content.push({ type: 'text', text: part.text });
+          content.push({ type: 'text', text: part.text })
         } else if (part.type === 'tool-call') {
           content.push({
             type: 'tool_use',
             id: part.toolCallId,
             name: part.toolName,
             input: (part as any).args,
-          });
+          })
         }
       }
     } else if (typeof lastMessage.content === 'string') {
-      content.push({ type: 'text', text: lastMessage.content });
+      content.push({ type: 'text', text: lastMessage.content })
     }
-    
+
     return {
       id: `msg_${Date.now()}`,
       type: 'message',
@@ -383,47 +416,50 @@ export class AnthropicParser implements ProviderParser {
         input_tokens: 0,
         output_tokens: 0,
       },
-    };
+    }
   }
 
   parseSSE(events: SSEEvent[]): any | undefined {
-    if (events.length === 0) return undefined;
+    if (events.length === 0) return undefined
 
-    let response: any = null;
-    const contentParts: any[] = [];
+    let response: any = null
+    const contentParts: any[] = []
 
     for (const event of events) {
-      const data = event.data;
+      const data = event.data
 
       // Skip raw string events
-      if (data?.raw) continue;
+      if (data?.raw) continue
 
       if (data?.type === 'message_start' && data.message) {
-        response = data.message;
+        response = data.message
       } else if (data?.type === 'content_block_start' && data.content_block) {
-        const index = data.index ?? contentParts.length;
-        contentParts[index] = data.content_block;
+        const index = data.index ?? contentParts.length
+        contentParts[index] = data.content_block
       } else if (data?.type === 'content_block_delta' && data.delta) {
-        const index = data.index ?? contentParts.length - 1;
+        const index = data.index ?? contentParts.length - 1
         if (contentParts[index]) {
           if (data.delta.type === 'text_delta') {
-            contentParts[index].text = (contentParts[index].text || '') + data.delta.text;
+            contentParts[index].text =
+              (contentParts[index].text || '') + data.delta.text
           } else if (data.delta.type === 'input_json_delta') {
-            contentParts[index].input = (contentParts[index].input || '') + data.delta.partial_json;
+            contentParts[index].input =
+              (contentParts[index].input || '') + data.delta.partial_json
           }
         }
       } else if (data?.type === 'message_delta' && data.delta) {
         if (response) {
-          if (data.delta.stop_reason) response.stop_reason = data.delta.stop_reason;
-          if (data.usage) response.usage = data.usage;
+          if (data.delta.stop_reason)
+            response.stop_reason = data.delta.stop_reason
+          if (data.usage) response.usage = data.usage
         }
       }
     }
 
     if (response && contentParts.length > 0) {
-      response.content = contentParts.filter(p => p !== undefined);
+      response.content = contentParts.filter(p => p !== undefined)
     }
 
-    return response;
+    return response
   }
 }

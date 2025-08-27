@@ -14,7 +14,7 @@ import {
   Layers,
   ArrowDown,
   GitBranch,
-  Share2
+  Share2,
 } from 'lucide-react'
 import Logo from './Logo'
 import TerminalWindow from './TerminalWindow'
@@ -28,17 +28,15 @@ interface LandingPageProps {
 // Section Component
 const Section = ({
   children,
-  className = "",
-  id
+  className = '',
+  id,
 }: {
   children: React.ReactNode
   className?: string
   id?: string
 }) => (
   <section id={id} className={`py-24 px-4 sm:px-6 lg:px-8 ${className}`}>
-    <div className="max-w-7xl mx-auto">
-      {children}
-    </div>
+    <div className="max-w-7xl mx-auto">{children}</div>
   </section>
 )
 
@@ -47,7 +45,7 @@ const FeatureCard = ({
   icon: Icon,
   title,
   description,
-  features
+  features,
 }: {
   icon: React.ElementType
   title: string
@@ -75,7 +73,7 @@ const FeatureCard = ({
 const HowItWorksStep = ({
   icon: Icon,
   title,
-  description
+  description,
 }: {
   icon: React.ElementType
   title: string
@@ -87,7 +85,9 @@ const HowItWorksStep = ({
         <Icon className="w-6 h-6 text-white" />
       </div>
       <div className="flex-1">
-        <h3 className="text-xl font-semibold mb-2 text-gray-900 group-hover:text-purple-600 transition-colors">{title}</h3>
+        <h3 className="text-xl font-semibold mb-2 text-gray-900 group-hover:text-purple-600 transition-colors">
+          {title}
+        </h3>
         <p className="text-gray-600 leading-relaxed">{description}</p>
       </div>
     </div>
@@ -110,7 +110,10 @@ const Navigation = ({ loggedIn }: { loggedIn: boolean }) => (
             </Link>
           ) : (
             <>
-              <Link href="/app" className="text-gray-600 hover:text-gray-900 transition-colors">
+              <Link
+                href="/app"
+                className="text-gray-600 hover:text-gray-900 transition-colors"
+              >
                 {copy.common.signIn}
               </Link>
               <Link
@@ -147,10 +150,30 @@ const SessionVisualization = () => (
       </div>
 
       <div className="space-y-2">
-        <SessionMessage type="request" number={1} time="14:23:01" content="Create a Python function to parse JSON" />
-        <SessionMessage type="response" number={1} time="14:23:02" content="def parse_json(data): ..." />
-        <SessionMessage type="request" number={2} time="14:23:15" content="Add error handling to that function" />
-        <SessionMessage type="response" number={2} time="14:23:16" content="try: ... except JSONDecodeError: ..." />
+        <SessionMessage
+          type="request"
+          number={1}
+          time="14:23:01"
+          content="Create a Python function to parse JSON"
+        />
+        <SessionMessage
+          type="response"
+          number={1}
+          time="14:23:02"
+          content="def parse_json(data): ..."
+        />
+        <SessionMessage
+          type="request"
+          number={2}
+          time="14:23:15"
+          content="Add error handling to that function"
+        />
+        <SessionMessage
+          type="response"
+          number={2}
+          time="14:23:16"
+          content="try: ... except JSONDecodeError: ..."
+        />
       </div>
 
       <div className="mt-4 text-xs text-gray-400 text-center">
@@ -160,7 +183,12 @@ const SessionVisualization = () => (
   </div>
 )
 
-const SessionMessage = ({ type, number, time, content }: {
+const SessionMessage = ({
+  type,
+  number,
+  time,
+  content,
+}: {
   type: 'request' | 'response'
   number: number
   time: string
@@ -168,25 +196,36 @@ const SessionMessage = ({ type, number, time, content }: {
 }) => {
   const isRequest = type === 'request'
   return (
-    <div className={`bg-gray-800 rounded-lg p-3 border-l-2 ${isRequest ? 'border-blue-500' : 'border-green-500'}`}>
+    <div
+      className={`bg-gray-800 rounded-lg p-3 border-l-2 ${isRequest ? 'border-blue-500' : 'border-green-500'}`}
+    >
       <p className="text-xs text-gray-500 mb-1">
         {isRequest ? 'Request' : 'Response'} {number} • {time}
       </p>
-      <p className={`text-sm font-mono ${isRequest ? 'text-blue-300' : 'text-green-300'}`}>
+      <p
+        className={`text-sm font-mono ${isRequest ? 'text-blue-300' : 'text-green-300'}`}
+      >
         {isRequest ? '→' : '←'} &quot;{content}&quot;
       </p>
     </div>
   )
 }
 
-const SessionFeature = ({ icon: Icon, color, title, description }: {
+const SessionFeature = ({
+  icon: Icon,
+  color,
+  title,
+  description,
+}: {
   icon: React.ElementType
   color: string
   title: string
   description: string
 }) => (
   <div className="flex items-start gap-3">
-    <div className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5`}>
+    <div
+      className={`w-8 h-8 ${color} rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5`}
+    >
       <Icon className="w-5 h-5 text-blue-600" />
     </div>
     <div>
@@ -215,7 +254,9 @@ const SessionIntelligence = () => (
 
     <div className="grid md:grid-cols-2 gap-12 items-center">
       <div>
-        <h3 className="text-2xl font-bold mb-6">{copy.sessionIntelligence.mainFeatures.title}</h3>
+        <h3 className="text-2xl font-bold mb-6">
+          {copy.sessionIntelligence.mainFeatures.title}
+        </h3>
         <p className="text-gray-600 mb-6">
           {copy.sessionIntelligence.mainFeatures.description}
         </p>
@@ -224,14 +265,21 @@ const SessionIntelligence = () => (
           <SessionFeature
             icon={Network}
             color="bg-blue-100"
-            title={copy.sessionIntelligence.mainFeatures.features.detection.title}
-            description={copy.sessionIntelligence.mainFeatures.features.detection.description}
+            title={
+              copy.sessionIntelligence.mainFeatures.features.detection.title
+            }
+            description={
+              copy.sessionIntelligence.mainFeatures.features.detection
+                .description
+            }
           />
           <SessionFeature
             icon={Layers}
             color="bg-blue-100"
             title={copy.sessionIntelligence.mainFeatures.features.context.title}
-            description={copy.sessionIntelligence.mainFeatures.features.context.description}
+            description={
+              copy.sessionIntelligence.mainFeatures.features.context.description
+            }
           />
         </div>
       </div>
@@ -296,7 +344,10 @@ $ claude
 
         <div className="relative">
           <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-blue-400 blur-3xl opacity-20"></div>
-          <BrowserScreenshot imageSrc="/landing-screenshot.png" addressBarUrl={`${DOMAIN}/workspace-1/requests`} />
+          <BrowserScreenshot
+            imageSrc="/landing-screenshot.png"
+            addressBarUrl={`${DOMAIN}/workspace-1/requests`}
+          />
         </div>
       </Section>
 
@@ -335,27 +386,40 @@ $ claude
           <div className="relative">
             <div className="bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl p-8">
               <div className="mb-6">
-                <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">{copy.howItWorks.example.label}</span>
+                <span className="text-xs font-semibold text-purple-600 uppercase tracking-wider">
+                  {copy.howItWorks.example.label}
+                </span>
               </div>
               <div className="flex items-center gap-3 mb-6">
                 <Terminal className="w-5 h-5 text-purple-600" />
-                <span className="text-lg font-semibold text-gray-900">{copy.howItWorks.example.title}</span>
+                <span className="text-lg font-semibold text-gray-900">
+                  {copy.howItWorks.example.title}
+                </span>
               </div>
               <p className="text-gray-600 mb-6">
-                {copy.howItWorks.example.description} <code className="px-2 py-1 bg-white rounded text-sm text-purple-600 font-mono">{copy.howItWorks.example.variable}</code>
+                {copy.howItWorks.example.description}{' '}
+                <code className="px-2 py-1 bg-white rounded text-sm text-purple-600 font-mono">
+                  {copy.howItWorks.example.variable}
+                </code>
               </p>
               <div className="space-y-3">
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">{copy.howItWorks.example.points[0]}</span>
+                  <span className="text-gray-700">
+                    {copy.howItWorks.example.points[0]}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">{copy.howItWorks.example.points[1]}</span>
+                  <span className="text-gray-700">
+                    {copy.howItWorks.example.points[1]}
+                  </span>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                  <span className="text-gray-700">{copy.howItWorks.example.points[2]}</span>
+                  <span className="text-gray-700">
+                    {copy.howItWorks.example.points[2]}
+                  </span>
                 </div>
               </div>
             </div>
@@ -420,7 +484,9 @@ $ claude
 
         <div className="grid md:grid-cols-2 gap-12 items-center">
           <div>
-            <h3 className="text-2xl font-bold mb-6">{copy.gatewaySection.universalTranslation.title}</h3>
+            <h3 className="text-2xl font-bold mb-6">
+              {copy.gatewaySection.universalTranslation.title}
+            </h3>
             <p className="text-gray-600 mb-6">
               {copy.gatewaySection.universalTranslation.description}
             </p>
@@ -431,9 +497,17 @@ $ claude
                   <CheckCircle2 className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">{copy.gatewaySection.universalTranslation.features.conversion.title}</h4>
+                  <h4 className="font-semibold mb-1">
+                    {
+                      copy.gatewaySection.universalTranslation.features
+                        .conversion.title
+                    }
+                  </h4>
                   <p className="text-sm text-gray-600">
-                    {copy.gatewaySection.universalTranslation.features.conversion.description}
+                    {
+                      copy.gatewaySection.universalTranslation.features
+                        .conversion.description
+                    }
                   </p>
                 </div>
               </div>
@@ -443,9 +517,17 @@ $ claude
                   <Eye className="w-5 h-5 text-green-600" />
                 </div>
                 <div>
-                  <h4 className="font-semibold mb-1">{copy.gatewaySection.universalTranslation.features.visibility.title}</h4>
+                  <h4 className="font-semibold mb-1">
+                    {
+                      copy.gatewaySection.universalTranslation.features
+                        .visibility.title
+                    }
+                  </h4>
                   <p className="text-sm text-gray-600">
-                    {copy.gatewaySection.universalTranslation.features.visibility.description}
+                    {
+                      copy.gatewaySection.universalTranslation.features
+                        .visibility.description
+                    }
                   </p>
                 </div>
               </div>
@@ -454,12 +536,21 @@ $ claude
 
           <TerminalWindow enableControls={false}>
             <div>
-              <div className="mb-4 text-gray-500"># Your app thinks it&apos;s using Claude...</div>
-              <div className="mb-2">$ export ANTHROPIC_BASE_URL={DOMAIN}/workspace-1/anthropic</div>
+              <div className="mb-4 text-gray-500">
+                # Your app thinks it&apos;s using Claude...
+              </div>
+              <div className="mb-2">
+                $ export ANTHROPIC_BASE_URL={DOMAIN}/workspace-1/anthropic
+              </div>
               <div className="mb-4">$ claude </div>
 
-              <div className="mb-2 ">{">"} Build me a LangChain agent that teaches me how to cook sushi</div>
-              <div className="mb-4 text-gray-500"># Actually, claude talks with ChatGPT</div>
+              <div className="mb-2 ">
+                {'>'} Build me a LangChain agent that teaches me how to cook
+                sushi
+              </div>
+              <div className="mb-4 text-gray-500">
+                # Actually, claude talks with ChatGPT
+              </div>
             </div>
           </TerminalWindow>
         </div>
@@ -488,9 +579,7 @@ $ claude
             <p className="text-2xl text-gray-600 mb-8">
               {copy.pricing.subtitle}
             </p>
-            <p className="text-gray-500 mb-8">
-              {copy.pricing.description}
-            </p>
+            <p className="text-gray-500 mb-8">{copy.pricing.description}</p>
             <Link
               href="/app"
               className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-xl transition-all duration-200 font-semibold text-lg group"
@@ -508,9 +597,7 @@ $ claude
           <h2 className="text-4xl md:text-5xl font-bold text-white mb-6">
             {copy.cta.title}
           </h2>
-          <p className="text-xl text-blue-100 mb-8">
-            {copy.cta.subtitle}
-          </p>
+          <p className="text-xl text-blue-100 mb-8">{copy.cta.subtitle}</p>
           <Link
             href="/app"
             className="inline-flex items-center gap-2 px-8 py-4 bg-white text-purple-700 rounded-xl hover:shadow-2xl transition-all duration-200 font-semibold text-lg group"
@@ -527,11 +614,11 @@ $ claude
           <div className="flex flex-col md:flex-row justify-between items-center">
             <div className="mb-4 md:mb-0">
               <div className="flex items-center gap-2 mb-2">
-                <span className="text-xl font-bold text-white">{copy.brand.name}</span>
+                <span className="text-xl font-bold text-white">
+                  {copy.brand.name}
+                </span>
               </div>
-              <p className="text-gray-400 text-sm">
-                {copy.footer.copyright}
-              </p>
+              <p className="text-gray-400 text-sm">{copy.footer.copyright}</p>
             </div>
           </div>
         </div>

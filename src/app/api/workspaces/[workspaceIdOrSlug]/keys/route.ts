@@ -18,32 +18,32 @@ export async function GET(
     // Find workspace and verify user has access
     const workspace = await prisma.workspace.findFirst({
       where: {
-        OR: [
-          { id: workspaceIdOrSlug },
-          { slug: workspaceIdOrSlug }
-        ],
+        OR: [{ id: workspaceIdOrSlug }, { slug: workspaceIdOrSlug }],
         users: {
           some: {
             user: {
-              email: session.user.email
-            }
-          }
-        }
+              email: session.user.email,
+            },
+          },
+        },
       },
       include: {
         authKeys: {
           where: {
-            deletedAt: null
+            deletedAt: null,
           },
           orderBy: {
-            createdAt: 'desc'
-          }
-        }
-      }
+            createdAt: 'desc',
+          },
+        },
+      },
     })
 
     if (!workspace) {
-      return NextResponse.json({ error: 'Workspace not found or access denied' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Workspace not found or access denied' },
+        { status: 404 }
+      )
     }
 
     // Return keys - full key for non-hashed, masked for hashed
@@ -79,23 +79,23 @@ export async function POST(
     // Find workspace and verify user has access
     const workspace = await prisma.workspace.findFirst({
       where: {
-        OR: [
-          { id: workspaceIdOrSlug },
-          { slug: workspaceIdOrSlug }
-        ],
+        OR: [{ id: workspaceIdOrSlug }, { slug: workspaceIdOrSlug }],
         users: {
           some: {
             user: {
-              email: session.user.email
+              email: session.user.email,
             },
-            role: { in: ['admin', 'owner'] } // Only admins/owners can create keys
-          }
-        }
-      }
+            role: { in: ['admin', 'owner'] }, // Only admins/owners can create keys
+          },
+        },
+      },
     })
 
     if (!workspace) {
-      return NextResponse.json({ error: 'Workspace not found or insufficient permissions' }, { status: 404 })
+      return NextResponse.json(
+        { error: 'Workspace not found or insufficient permissions' },
+        { status: 404 }
+      )
     }
 
     // Generate a secure API key
@@ -105,8 +105,8 @@ export async function POST(
       data: {
         key: apiKey,
         workspaceId: workspace.id,
-        hashed: false
-      }
+        hashed: false,
+      },
     })
 
     return NextResponse.json({

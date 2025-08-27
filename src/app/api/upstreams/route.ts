@@ -46,7 +46,7 @@ export const POST = withError(async (request: NextRequest) => {
   if (existingUpstream) {
     return NextResponse.json(
       { error: 'An upstream with this name already exists in this workspace' },
-      { status: 400 },
+      { status: 400 }
     )
   }
 

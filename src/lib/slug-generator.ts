@@ -1,9 +1,42 @@
 const adjectives = [
-  'quick', 'lazy', 'bright', 'dark', 'swift', 'calm', 'bold', 'wise', 'neat', 'cool', 'brave', 'fierce', 'gentle', 'happy', 'sad', 'lucky', 'mighty', 'noble', 'proud', 'sly'
+  'quick',
+  'lazy',
+  'bright',
+  'dark',
+  'swift',
+  'calm',
+  'bold',
+  'wise',
+  'neat',
+  'cool',
+  'brave',
+  'fierce',
+  'gentle',
+  'happy',
+  'sad',
+  'lucky',
+  'mighty',
+  'noble',
+  'proud',
+  'sly',
 ]
 
 const nouns = [
-  'fox', 'cat', 'dog', 'bird', 'fish', 'bear', 'wolf', 'deer', 'lion', 'tiger', 'oppossum', 'eagle', 'shark', 'whale', 'dolphin'
+  'fox',
+  'cat',
+  'dog',
+  'bird',
+  'fish',
+  'bear',
+  'wolf',
+  'deer',
+  'lion',
+  'tiger',
+  'oppossum',
+  'eagle',
+  'shark',
+  'whale',
+  'dolphin',
 ]
 
 export function generateRandomSlug(): string {

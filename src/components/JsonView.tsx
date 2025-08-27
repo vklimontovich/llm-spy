@@ -11,9 +11,8 @@ import styles from './JsonView.module.css'
 
 const ReactJsonView = dynamic(() => import('@microlink/react-json-view'), {
   ssr: false,
-  loading: () => <div className="p-3">Loading...</div>
+  loading: () => <div className="p-3">Loading...</div>,
 })
-
 
 interface JsonViewProps {
   data: any
@@ -23,7 +22,11 @@ interface JsonViewProps {
 
 type ViewMode = 'json' | 'yaml' | 'tree'
 
-export default function JsonView({ data, className = '', simple = false }: JsonViewProps) {
+export default function JsonView({
+  data,
+  className = '',
+  simple = false,
+}: JsonViewProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('json')
   const [copied, setCopied] = useState(false)
 
@@ -128,18 +131,24 @@ export default function JsonView({ data, className = '', simple = false }: JsonV
           <Segmented
             size="small"
             value={viewMode}
-            onChange={(value) => setViewMode(value as ViewMode)}
+            onChange={value => setViewMode(value as ViewMode)}
             options={[
               { label: 'JSON', value: 'json' },
               { label: 'YAML', value: 'yaml' },
-              { label: 'Tree', value: 'tree' }
+              { label: 'Tree', value: 'tree' },
             ]}
           />
         )}
         <Button
           type="text"
           size="small"
-          icon={copied ? <Check size={14} className="text-green-500" /> : <Copy size={14} />}
+          icon={
+            copied ? (
+              <Check size={14} className="text-green-500" />
+            ) : (
+              <Copy size={14} />
+            )
+          }
           onClick={handleCopy}
           className="flex items-center"
         />

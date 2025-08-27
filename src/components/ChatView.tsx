@@ -24,28 +24,28 @@ const getRoleConfig = (role: string) => {
         color: '#3b82f6',
         bgColor: '#f0f9ff',
         icon: User,
-        label: 'User'
+        label: 'User',
       }
     case 'assistant':
       return {
         color: '#10b981',
         bgColor: '#f0fdf4',
         icon: Bot,
-        label: 'Assistant'
+        label: 'Assistant',
       }
     case 'system':
       return {
         color: '#f97316',
         bgColor: '#fff7ed',
         icon: Settings,
-        label: 'System'
+        label: 'System',
       }
     default:
       return {
         color: '#6b7280',
         bgColor: '#f9fafb',
         icon: MessageSquare,
-        label: role
+        label: role,
       }
   }
 }
@@ -59,13 +59,17 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
     // Split messages with array content into individual messages
     if (Array.isArray(message.content) && message.content.length > 1) {
       // Create a group for multi-part messages
-      const splitMessages: ModelMessage[] = message.content.map((part) => ({
-        ...message,
-        content: [part] // Each message now has single content item
-      } as ModelMessage))
+      const splitMessages: ModelMessage[] = message.content.map(
+        part =>
+          ({
+            ...message,
+            content: [part], // Each message now has single content item
+          }) as ModelMessage
+      )
 
       // Determine group role
-      const groupRole: 'system' | 'user' | 'assistant' = message.role === 'tool' ? 'user' : message.role as any
+      const groupRole: 'system' | 'user' | 'assistant' =
+        message.role === 'tool' ? 'user' : (message.role as any)
 
       if (groupId !== undefined) {
         // Add to existing group or create new one
@@ -74,7 +78,7 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
           group = {
             messages: [],
             role: groupRole,
-            groupId
+            groupId,
           }
           groups.push(group)
         }
@@ -87,7 +91,7 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
         groups.push({
           messages: splitMessages,
           role: groupRole,
-          groupId: `split-${groups.length}` // Synthetic group ID
+          groupId: `split-${groups.length}`, // Synthetic group ID
         })
       }
     } else {
@@ -95,11 +99,12 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
       if (groupId !== undefined) {
         let group = groups.find(g => g.groupId === groupId)
         if (!group) {
-          const groupRole: 'system' | 'user' | 'assistant' = message.role === 'tool' ? 'user' : message.role as any
+          const groupRole: 'system' | 'user' | 'assistant' =
+            message.role === 'tool' ? 'user' : (message.role as any)
           group = {
             messages: [],
             role: groupRole,
-            groupId
+            groupId,
           }
           groups.push(group)
         }
@@ -109,11 +114,11 @@ function groupMessages(messages: ModelMessage[]): GroupedMessage[] {
         }
       } else {
         // No group, add as single message group
-        const role = message.role === 'tool' ? 'user' : message.role as any
+        const role = message.role === 'tool' ? 'user' : (message.role as any)
         groups.push({
           messages: [message],
           role: role,
-          groupId: undefined
+          groupId: undefined,
         })
       }
     }
@@ -167,7 +172,9 @@ function MessageContent({ message }: { message: ModelMessage }) {
         return (
           <div>
             <Text className="text-xs text-gray-500 mb-1">Image</Text>
-            <SmartContentView data={(part as any).image || (part as any).data} />
+            <SmartContentView
+              data={(part as any).image || (part as any).data}
+            />
           </div>
         )
 
@@ -185,11 +192,19 @@ function MessageContent({ message }: { message: ModelMessage }) {
             <div className="mb-2">
               <Wrench className="inline w-4 h-4 text-gray-500 mr-2" />
               <Text className="text-sm text-gray-600">Tool Call</Text>
-              <Text className="text-sm font-medium ml-2">{part.toolName || 'unknown'}</Text>
+              <Text className="text-sm font-medium ml-2">
+                {part.toolName || 'unknown'}
+              </Text>
             </div>
             <div className="">
               <SmartContentView
-                data={'args' in part ? part.args : ('arguments' in part ? part.arguments : {})}
+                data={
+                  'args' in part
+                    ? part.args
+                    : 'arguments' in part
+                      ? part.arguments
+                      : {}
+                }
               />
             </div>
           </div>
@@ -201,13 +216,19 @@ function MessageContent({ message }: { message: ModelMessage }) {
             <div className="mb-2">
               <Wrench className="inline w-4 h-4 text-gray-500 mr-2" />
               <Text className="text-sm text-gray-600">Tool Result</Text>
-              <Text className="text-sm font-medium ml-2">{part.toolName || 'unknown'}</Text>
+              <Text className="text-sm font-medium ml-2">
+                {part.toolName || 'unknown'}
+              </Text>
             </div>
             <div className="pl-6">
               <SmartContentView
-                data={typeof part.output === 'object' && part.output && 'value' in part.output
-                  ? part.output.value
-                  : part.output}
+                data={
+                  typeof part.output === 'object' &&
+                  part.output &&
+                  'value' in part.output
+                    ? part.output.value
+                    : part.output
+                }
               />
             </div>
           </div>
@@ -238,7 +259,10 @@ function MessageGroupView({ group }: { group: GroupedMessage }) {
         style={{ backgroundColor: roleConfig.bgColor }}
       >
         <div className="flex items-center gap-2 mb-2">
-          <IconComponent className="w-4 h-4" style={{ color: roleConfig.color }} />
+          <IconComponent
+            className="w-4 h-4"
+            style={{ color: roleConfig.color }}
+          />
           <span
             className="text-sm font-semibold"
             style={{ color: roleConfig.color }}
@@ -267,7 +291,10 @@ function MessageGroupView({ group }: { group: GroupedMessage }) {
     >
       {/* Header */}
       <div className="flex items-center gap-2 mb-3">
-        <IconComponent className="w-4 h-4" style={{ color: roleConfig.color }} />
+        <IconComponent
+          className="w-4 h-4"
+          style={{ color: roleConfig.color }}
+        />
         <span
           className="text-sm font-semibold"
           style={{ color: roleConfig.color }}
@@ -286,11 +313,7 @@ function MessageGroupView({ group }: { group: GroupedMessage }) {
       <div>
         {group.messages.map((message, idx) => (
           <div key={idx}>
-            {idx > 0 && (
-              <div
-                className="h-[2px] my-3 bg-gray-200"
-              />
-            )}
+            {idx > 0 && <div className="h-[2px] my-3 bg-gray-200" />}
             <div className="text-gray-800">
               <MessageContent message={message} />
             </div>

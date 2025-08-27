@@ -1,11 +1,17 @@
-import GoogleProvider from "next-auth/providers/google"
-import { prisma } from "@/lib/prisma"
-import { hash } from "@/lib/hash"
-import { NextAuthOptions } from "next-auth"
+import GoogleProvider from 'next-auth/providers/google'
+import { prisma } from '@/lib/prisma'
+import { hash } from '@/lib/hash'
+import { NextAuthOptions } from 'next-auth'
 import { assertDefined } from '@/lib/preconditions'
 
-console.assert(process.env.GOOGLE_CLIENT_SECRET, "GOOGLE_CLIENT_SECRET must be set in environment variables")
-console.assert(process.env.GOOGLE_CLIENT_ID, "GOOGLE_CLIENT_ID must be set in environment variables")
+console.assert(
+  process.env.GOOGLE_CLIENT_SECRET,
+  'GOOGLE_CLIENT_SECRET must be set in environment variables'
+)
+console.assert(
+  process.env.GOOGLE_CLIENT_ID,
+  'GOOGLE_CLIENT_ID must be set in environment variables'
+)
 
 export const authOptions: NextAuthOptions = {
   pages: {
@@ -18,12 +24,13 @@ export const authOptions: NextAuthOptions = {
       clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
       authorization: {
         params: {
-          prompt: "select_account",
+          prompt: 'select_account',
         },
       },
-    })
+    }),
   ],
-  secret: process.env.NEXTAUTH_SECRET || hash(process.env.GOOGLE_CLIENT_SECRET!),
+  secret:
+    process.env.NEXTAUTH_SECRET || hash(process.env.GOOGLE_CLIENT_SECRET!),
   callbacks: {
     async signIn({ user, account }) {
       assertDefined(user.email, 'User email must be defined in signIn callback')
@@ -36,9 +43,9 @@ export const authOptions: NextAuthOptions = {
         where: {
           provider_externalUserId: {
             provider,
-            externalUserId
-          }
-        }
+            externalUserId,
+          },
+        },
       })
 
       // If not found, check for legacy user (provider = null, externalUserId = null)
@@ -47,8 +54,8 @@ export const authOptions: NextAuthOptions = {
           where: {
             email: user.email,
             provider: null,
-            externalUserId: null
-          }
+            externalUserId: null,
+          },
         })
 
         // If found legacy user, update with provider and externalUserId
@@ -57,8 +64,8 @@ export const authOptions: NextAuthOptions = {
             where: { id: existingUser.id },
             data: {
               provider,
-              externalUserId
-            }
+              externalUserId,
+            },
           })
         }
       }
@@ -69,12 +76,12 @@ export const authOptions: NextAuthOptions = {
           data: {
             email: user.email,
             provider,
-            externalUserId
-          }
+            externalUserId,
+          },
         })
       }
 
-      return true;
+      return true
     },
     async session({ session, token }) {
       // Ensure the session includes the user's email
@@ -90,6 +97,6 @@ export const authOptions: NextAuthOptions = {
         token.email = user.email
       }
       return token
-    }
-  }
+    },
+  },
 }

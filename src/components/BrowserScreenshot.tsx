@@ -6,10 +6,10 @@ interface BrowserScreenshotProps {
   addressBarUrl?: string
 }
 
-export default function BrowserScreenshot({ 
-  imageSrc, 
+export default function BrowserScreenshot({
+  imageSrc,
   showAddressBar = true,
-  addressBarUrl = "llm-spy.com/workspace-1/requests"
+  addressBarUrl = 'llm-spy.com/workspace-1/requests',
 }: BrowserScreenshotProps) {
   return (
     <div className="relative bg-white rounded-2xl shadow-2xl border border-gray-200">
@@ -23,7 +23,7 @@ export default function BrowserScreenshot({
           </div>
         </div>
       )}
-      <div className={showAddressBar ? "" : "rounded-2xl overflow-hidden"}>
+      <div className={showAddressBar ? '' : 'rounded-2xl overflow-hidden'}>
         {imageSrc ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img

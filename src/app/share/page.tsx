@@ -55,14 +55,16 @@ function SharePageContent() {
 
 export default function SharePage() {
   return (
-    <Suspense fallback={
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Spin size="large" />
-          <div className="text-lg text-gray-600">Loading...</div>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center">
+          <div className="flex flex-col items-center gap-4">
+            <Spin size="large" />
+            <div className="text-lg text-gray-600">Loading...</div>
+          </div>
         </div>
-      </div>
-    }>
+      }
+    >
       <SharePageContent />
     </Suspense>
   )

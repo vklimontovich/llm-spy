@@ -141,7 +141,11 @@ export default async function Image() {
               marginTop: '20px',
             }}
           >
-            {['LLM Translation', 'Session Intelligence', 'Real-time Monitoring'].map((feature) => (
+            {[
+              'LLM Translation',
+              'Session Intelligence',
+              'Real-time Monitoring',
+            ].map(feature => (
               <div
                 key={feature}
                 style={{
@@ -199,7 +203,7 @@ export default async function Image() {
             gap: '8px',
           }}
         >
-          {[1, 2, 3].map((i) => (
+          {[1, 2, 3].map(i => (
             <div
               key={i}
               style={{

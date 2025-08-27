@@ -4,7 +4,7 @@
  */
 export function extractSessionId(headers: any): string | null {
   if (!headers || typeof headers !== 'object') return null
-  
+
   // Extract from sentry-trace header
   // Format: {trace_id}-{parent_span_id}-{sampled}
   const sentryTrace = headers['sentry-trace']
@@ -15,13 +15,13 @@ export function extractSessionId(headers: any): string | null {
       return parts[0]
     }
   }
-  
+
   // Add other header extraction logic here as needed
   // For example:
   // - X-Request-ID
   // - X-Correlation-ID
   // - X-Session-ID
-  
+
   return null
 }
 
@@ -32,13 +32,13 @@ export function groupRequestsBySession<T extends { requestHeaders: any }>(
   requests: T[]
 ): Map<string | null, T[]> {
   const sessionMap = new Map<string | null, T[]>()
-  
+
   for (const request of requests) {
     const sessionId = extractSessionId(request.requestHeaders)
     const existing = sessionMap.get(sessionId) || []
     existing.push(request)
     sessionMap.set(sessionId, existing)
   }
-  
+
   return sessionMap
 }

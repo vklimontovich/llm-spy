@@ -8,12 +8,15 @@ interface LogoProps {
 
 export default function Logo({ href = '/', className = '' }: LogoProps) {
   return (
-    <Link href={href} className={`inline-flex items-center gap-2 group ${className}`}>
+    <Link
+      href={href}
+      className={`inline-flex items-center gap-2 group ${className}`}
+    >
       <div className="w-8 h-8 relative group-hover:scale-110 transition-transform">
-        <Image 
-          src="/icon.svg" 
-          alt="LLM SPY Logo" 
-          width={32} 
+        <Image
+          src="/icon.svg"
+          alt="LLM SPY Logo"
+          width={32}
           height={32}
           className="w-full h-full"
         />

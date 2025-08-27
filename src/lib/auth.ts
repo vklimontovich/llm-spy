@@ -29,7 +29,6 @@ export async function requireAuth() {
 export async function hasAuth() {
   const session = await getSession()
   return !!session?.user?.email
-
 }
 
 export function getWorkspaceIdOrSlug(request: NextRequest): string | null {
@@ -44,14 +43,11 @@ export function getWorkspaceIdOrSlug(request: NextRequest): string | null {
 
 export async function requireWorkspaceAccess(
   workspaceIdOrSlug: string,
-  userEmail: string,
+  userEmail: string
 ): Promise<{ id: string; slug: string; name: string; role: string }> {
   const workspace = await prisma.workspace.findFirst({
     where: {
-      OR: [
-        { id: workspaceIdOrSlug },
-        { slug: workspaceIdOrSlug },
-      ],
+      OR: [{ id: workspaceIdOrSlug }, { slug: workspaceIdOrSlug }],
       users: {
         some: {
           user: {
@@ -90,17 +86,22 @@ export async function requireWorkspaceAccess(
 }
 
 export async function checkWorkspaceAuth(request: NextRequest): Promise<{
-  session: Awaited<ReturnType<typeof requireAuth>>,
+  session: Awaited<ReturnType<typeof requireAuth>>
   workspace: { id: string; slug: string; name: string; role: string }
 }> {
   const session = await requireAuth()
   const workspaceIdOrSlug = getWorkspaceIdOrSlug(request)
 
   if (!workspaceIdOrSlug) {
-    throw new Error('X-Workspace-Id header or workspaceId parameter is required')
+    throw new Error(
+      'X-Workspace-Id header or workspaceId parameter is required'
+    )
   }
 
-  const workspace = await requireWorkspaceAccess(workspaceIdOrSlug, requireDefined(session?.user?.email, 'User email is required in session'))
+  const workspace = await requireWorkspaceAccess(
+    workspaceIdOrSlug,
+    requireDefined(session?.user?.email, 'User email is required in session')
+  )
 
   return { session, workspace }
 }

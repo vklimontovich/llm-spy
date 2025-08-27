@@ -5,8 +5,8 @@ import Logo from '@/components/Logo'
 import Link from 'next/link'
 
 export default function ShareLayout({
-                                      children,
-                                    }: {
+  children,
+}: {
   children: React.ReactNode
 }) {
   return (
@@ -22,9 +22,7 @@ export default function ShareLayout({
               </span>
             </div>
             <Link href="/">
-              <Button type="primary">
-                Login or Signup
-              </Button>
+              <Button type="primary">Login or Signup</Button>
             </Link>
           </div>
         </div>
@@ -32,9 +30,7 @@ export default function ShareLayout({
 
       {/* Main Content */}
       <main className="w-full min-w-[1024px]">
-        <div className="max-w-[1900px] mx-auto p-6">
-          {children}
-        </div>
+        <div className="max-w-[1900px] mx-auto p-6">{children}</div>
       </main>
 
       {/* Footer */}

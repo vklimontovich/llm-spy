@@ -11,12 +11,13 @@ interface ConnectionInstructionsProps {
 export default function ConnectionInstructions({
   workspaceSlug,
   upstreamName,
-  compact = false
+  compact = false,
 }: ConnectionInstructionsProps) {
   const [expanded, setExpanded] = useState(!compact)
-  const endpoint = typeof window !== 'undefined'
-    ? `${window.location.origin}/${workspaceSlug}/${upstreamName}`
-    : `https://your-domain.com/${workspaceSlug}/${upstreamName}`
+  const endpoint =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/${workspaceSlug}/${upstreamName}`
+      : `https://your-domain.com/${workspaceSlug}/${upstreamName}`
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
@@ -40,7 +41,11 @@ export default function ConnectionInstructions({
             </p>
 
             <p className="text-sm text-gray-700">
-              Add <code className="px-2 py-0.5 bg-gray-100 rounded text-gray-800">x-api-key</code> header for authentication.{' '}
+              Add{' '}
+              <code className="px-2 py-0.5 bg-gray-100 rounded text-gray-800">
+                x-api-key
+              </code>{' '}
+              header for authentication.{' '}
               <a
                 href={`/${workspaceSlug}/keys`}
                 className="text-blue-600 hover:text-blue-700"

@@ -1,6 +1,6 @@
 'use client'
 
-import {createContext, useContext, ReactNode} from 'react'
+import { createContext, useContext, ReactNode } from 'react'
 
 interface WorkspaceContextType {
   workspace: {
@@ -10,17 +10,19 @@ interface WorkspaceContextType {
   }
 }
 
-const WorkspaceContext = createContext<WorkspaceContextType | undefined>(undefined)
+const WorkspaceContext = createContext<WorkspaceContextType | undefined>(
+  undefined
+)
 
 export function WorkspaceProvider({
   children,
-  workspace
+  workspace,
 }: {
   children: ReactNode
   workspace: WorkspaceContextType['workspace']
 }) {
   return (
-    <WorkspaceContext.Provider value={{workspace}}>
+    <WorkspaceContext.Provider value={{ workspace }}>
       {children}
     </WorkspaceContext.Provider>
   )

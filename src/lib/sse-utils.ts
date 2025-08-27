@@ -30,20 +30,22 @@ export function parseSSEEvents(raw: string): SSEEvent[] {
         events.push({
           event: message.event,
           id: message.id,
-          data: jsonData
+          data: jsonData,
         })
       } catch {
         // If not JSON, store raw data string
         events.push({
           event: message.event,
           id: message.id,
-          data: { raw: message.data }
+          data: { raw: message.data },
         })
       }
     },
     onError(error) {
-      throw new Error("Failed to parse SSE events: " + error.message, { cause: error });
-    }
+      throw new Error('Failed to parse SSE events: ' + error.message, {
+        cause: error,
+      })
+    },
   })
 
   parser.feed(raw)
@@ -69,7 +71,9 @@ export function reconstructSSEResponse(raw: string): any {
   // Check if it's OpenAI format (not yet migrated to parser)
   const firstData = events[0]?.data
   if (firstData && !firstData.raw && firstData?.choices?.[0]) {
-    return reconstructOpenAISSE(events.map(e => e.data).filter(d => d && !d.raw))
+    return reconstructOpenAISSE(
+      events.map(e => e.data).filter(d => d && !d.raw)
+    )
   }
 
   // Return all events as-is if format unknown
@@ -91,9 +95,11 @@ function detectSSEFormat(events: SSEEvent[]): ProviderParser | undefined {
   }
 
   // Check for other Anthropic event types
-  if (firstData.type === 'content_block_start' ||
-      firstData.type === 'content_block_delta' ||
-      firstData.type === 'message_delta') {
+  if (
+    firstData.type === 'content_block_start' ||
+    firstData.type === 'content_block_delta' ||
+    firstData.type === 'message_delta'
+  ) {
     return new AnthropicParser()
   }
 
@@ -114,13 +120,15 @@ function reconstructOpenAISSE(eventData: any[]): any {
           object: data.object,
           created: data.created,
           model: data.model,
-          choices: [{
-            message: {
-              role: 'assistant',
-              content: ''
+          choices: [
+            {
+              message: {
+                role: 'assistant',
+                content: '',
+              },
+              finish_reason: null,
             },
-            finish_reason: null
-          }]
+          ],
         }
       }
 

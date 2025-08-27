@@ -7,12 +7,14 @@ import { getProvider } from '@/lib/format'
 import { parseSSEEvents } from '@/lib/sse-utils'
 
 export const GET = withError(async (request: NextRequest) => {
-
   const { searchParams } = new URL(request.url)
 
   const id = searchParams.get('id') || ''
 
-  const response = requireDefined(await prisma.response.findUnique({ where: { id } }), `Response ${id} not found`)
+  const response = requireDefined(
+    await prisma.response.findUnique({ where: { id } }),
+    `Response ${id} not found`
+  )
 
   if (!response.public) {
     const { workspace } = await checkWorkspaceAuth(request)
@@ -31,9 +33,12 @@ export const GET = withError(async (request: NextRequest) => {
   // Process request
   let rawRequestBody: any = null
   if (requestBody) {
-    const requestText = requestBody instanceof Uint8Array
-      ? new TextDecoder().decode(requestBody)
-      : typeof requestBody === 'string' ? requestBody : JSON.stringify(requestBody)
+    const requestText =
+      requestBody instanceof Uint8Array
+        ? new TextDecoder().decode(requestBody)
+        : typeof requestBody === 'string'
+          ? requestBody
+          : JSON.stringify(requestBody)
 
     try {
       rawRequestBody = JSON.parse(requestText)
@@ -49,9 +54,12 @@ export const GET = withError(async (request: NextRequest) => {
 
   let rawResponseJson
   if (responseBody) {
-    const responseText = responseBody instanceof Uint8Array
-      ? new TextDecoder().decode(responseBody)
-      : typeof responseBody === 'string' ? responseBody : JSON.stringify(responseBody)
+    const responseText =
+      responseBody instanceof Uint8Array
+        ? new TextDecoder().decode(responseBody)
+        : typeof responseBody === 'string'
+          ? responseBody
+          : JSON.stringify(responseBody)
 
     const responseContentType = responseHeaders?.['content-type'] || ''
     if (responseContentType.includes('text/event-stream')) {

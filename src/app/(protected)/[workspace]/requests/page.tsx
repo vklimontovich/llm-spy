@@ -14,7 +14,6 @@ import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 const PAGE_SIZE = 100
 
-
 export interface RequestResponse {
   id: string
   url: string
@@ -30,7 +29,8 @@ export interface RequestResponse {
 }
 
 export default function RequestsPage() {
-  const [selectedRequest, setSelectedRequest] = useState<RequestResponse | null>(null)
+  const [selectedRequest, setSelectedRequest] =
+    useState<RequestResponse | null>(null)
   const [liveRefresh, setLiveRefresh] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [offset, setOffset] = useState(0)
@@ -42,12 +42,7 @@ export default function RequestsPage() {
   const api = useWorkspaceApi()
   const { workspace } = useWorkspace()
 
-  const {
-    data,
-    isLoading,
-    error,
-    refetch,
-  } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['requests', offset],
     queryFn: async () => {
       const response = await api.get('/requests', {
@@ -119,7 +114,9 @@ export default function RequestsPage() {
         params.set('tab', tabKey)
       }
     }
-    const newUrl = params.toString() ? `/${workspace.slug}/requests?${params.toString()}` : `/${workspace.slug}/requests`
+    const newUrl = params.toString()
+      ? `/${workspace.slug}/requests?${params.toString()}`
+      : `/${workspace.slug}/requests`
     router.push(newUrl, { scroll: false })
   }
 
@@ -172,11 +169,12 @@ export default function RequestsPage() {
       dataIndex: 'createdAt',
       key: 'createdAt',
       width: 240,
-      render: (date) => {
+      render: date => {
         const formatted = formatDate(date)
         return (
           <span className="text-xs font-mono whitespace-nowrap">
-            {formatted.full} <span className="text-gray-500">({formatted.ago})</span>
+            {formatted.full}{' '}
+            <span className="text-gray-500">({formatted.ago})</span>
           </span>
         )
       },
@@ -186,14 +184,20 @@ export default function RequestsPage() {
       dataIndex: 'method',
       key: 'method',
       width: 70,
-      render: (method) => (
-        <span className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-          method === 'GET' ? 'bg-green-100 text-green-800' :
-            method === 'POST' ? 'bg-blue-100 text-blue-800' :
-              method === 'PUT' ? 'bg-yellow-100 text-yellow-800' :
-                method === 'DELETE' ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
-        }`}>
+      render: method => (
+        <span
+          className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
+            method === 'GET'
+              ? 'bg-green-100 text-green-800'
+              : method === 'POST'
+                ? 'bg-blue-100 text-blue-800'
+                : method === 'PUT'
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : method === 'DELETE'
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-gray-100 text-gray-800'
+          }`}
+        >
           {method}
         </span>
       ),
@@ -203,14 +207,20 @@ export default function RequestsPage() {
       dataIndex: 'status',
       key: 'status',
       width: 60,
-      render: (status) => (
-        <span className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-          status >= 200 && status < 300 ? 'bg-green-100 text-green-800' :
-            status >= 300 && status < 400 ? 'bg-blue-100 text-blue-800' :
-              status >= 400 && status < 500 ? 'bg-yellow-100 text-yellow-800' :
-                status >= 500 ? 'bg-red-100 text-red-800' :
-                  'bg-gray-100 text-gray-800'
-        }`}>
+      render: status => (
+        <span
+          className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
+            status >= 200 && status < 300
+              ? 'bg-green-100 text-green-800'
+              : status >= 300 && status < 400
+                ? 'bg-blue-100 text-blue-800'
+                : status >= 400 && status < 500
+                  ? 'bg-yellow-100 text-yellow-800'
+                  : status >= 500
+                    ? 'bg-red-100 text-red-800'
+                    : 'bg-gray-100 text-gray-800'
+          }`}
+        >
           {status}
         </span>
       ),
@@ -236,7 +246,7 @@ export default function RequestsPage() {
       title: 'URL',
       dataIndex: 'url',
       key: 'url',
-      render: (url) => (
+      render: url => (
         <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block max-w-xs">
           {url}
         </span>
@@ -247,7 +257,7 @@ export default function RequestsPage() {
       dataIndex: 'responseContentType',
       key: 'responseContentType',
       width: 200,
-      render: (contentType) => (
+      render: contentType => (
         <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block">
           {contentType || '-'}
         </span>
@@ -258,10 +268,8 @@ export default function RequestsPage() {
       dataIndex: 'requestBodySize',
       key: 'requestBodySize',
       width: 80,
-      render: (bytes) => (
-        <span className="text-xs whitespace-nowrap">
-          {formatBytes(bytes)}
-        </span>
+      render: bytes => (
+        <span className="text-xs whitespace-nowrap">{formatBytes(bytes)}</span>
       ),
     },
     {
@@ -269,10 +277,8 @@ export default function RequestsPage() {
       dataIndex: 'responseBodySize',
       key: 'responseBodySize',
       width: 80,
-      render: (bytes) => (
-        <span className="text-xs whitespace-nowrap">
-          {formatBytes(bytes)}
-        </span>
+      render: bytes => (
+        <span className="text-xs whitespace-nowrap">{formatBytes(bytes)}</span>
       ),
     },
   ]
@@ -280,7 +286,9 @@ export default function RequestsPage() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="text-red-600">Error loading requests: {error.message}</div>
+        <div className="text-red-600">
+          Error loading requests: {error.message}
+        </div>
       </div>
     )
   }
@@ -291,11 +299,14 @@ export default function RequestsPage() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-2xl font-bold">Requests</h1>
-            <p className="text-gray-600">View all proxied HTTP requests and responses</p>
+            <p className="text-gray-600">
+              View all proxied HTTP requests and responses
+            </p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
-              {allRequests.length > 0 && `Displaying ${allRequests.length} messages`}
+              {allRequests.length > 0 &&
+                `Displaying ${allRequests.length} messages`}
             </div>
             <Button
               icon={<RefreshCw className="w-4 h-4" />}
@@ -317,7 +328,8 @@ export default function RequestsPage() {
           <div />
           {lastRefreshed && (
             <div className="text-xs text-gray-500">
-              Last refreshed at {lastRefreshed.toLocaleTimeString()} ({formatDate(lastRefreshed.toISOString()).ago})
+              Last refreshed at {lastRefreshed.toLocaleTimeString()} (
+              {formatDate(lastRefreshed.toISOString()).ago})
             </div>
           )}
         </div>
@@ -334,7 +346,7 @@ export default function RequestsPage() {
             scroll={{ x: true }}
             size="small"
             className={styles.compactTable}
-            onRow={(record) => ({
+            onRow={record => ({
               onClick: () => {
                 setSelectedRequest(record)
                 updateUrl(record.id, 'chat')

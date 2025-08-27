@@ -19,20 +19,32 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
     // Extract tools/functions from first span that has them
     if (tools.length === 0) {
       // Check in gen_ai attributes
-      if (span.gen_ai?.request?.functions && Array.isArray(span.gen_ai.request.functions)) {
-        tools = span.gen_ai.request.functions.map(f => ({
-          name: f.name,
-          description: f.description,
-          inputSchema: f.parameters || {}
-        } as Tool))
+      if (
+        span.gen_ai?.request?.functions &&
+        Array.isArray(span.gen_ai.request.functions)
+      ) {
+        tools = span.gen_ai.request.functions.map(
+          f =>
+            ({
+              name: f.name,
+              description: f.description,
+              inputSchema: f.parameters || {},
+            }) as Tool
+        )
       }
       // Check in llm.request.functions if not found in gen_ai
-      else if (span.llm?.request?.functions && Array.isArray(span.llm.request.functions)) {
-        tools = span.llm.request.functions.map(f => ({
-          name: f.name,
-          description: f.description,
-          inputSchema: f.parameters || {}
-        } as Tool))
+      else if (
+        span.llm?.request?.functions &&
+        Array.isArray(span.llm.request.functions)
+      ) {
+        tools = span.llm.request.functions.map(
+          f =>
+            ({
+              name: f.name,
+              description: f.description,
+              inputSchema: f.parameters || {},
+            }) as Tool
+        )
       }
     }
 
@@ -40,17 +52,24 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
     if (span.gen_ai?.system) {
       modelMessages.push({
         role: 'system',
-        content: span.gen_ai.system
+        content: span.gen_ai.system,
       } as ModelMessage)
     }
 
     // Extract prompts from gen_ai attributes
     if (span.gen_ai?.prompt && Array.isArray(span.gen_ai.prompt)) {
       for (const prompt of span.gen_ai.prompt) {
-        const role = prompt.role === 'tool' ? 'tool' : prompt.role as 'system' | 'user' | 'assistant' | 'tool'
+        const role =
+          prompt.role === 'tool'
+            ? 'tool'
+            : (prompt.role as 'system' | 'user' | 'assistant' | 'tool')
 
         // Check if this prompt has tool_calls (assistant with tool calls)
-        if (prompt.tool_calls && Array.isArray(prompt.tool_calls) && role === 'assistant') {
+        if (
+          prompt.tool_calls &&
+          Array.isArray(prompt.tool_calls) &&
+          role === 'assistant'
+        ) {
           const parts: any[] = []
 
           // Add content if present
@@ -64,30 +83,32 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
               type: 'tool-call',
               toolCallId: tc.id,
               toolName: tc.name,
-              args: tc.arguments
+              args: tc.arguments,
             })
           }
 
           modelMessages.push({
             role: 'assistant',
-            content: parts
+            content: parts,
           } as ModelMessage)
         } else if (role === 'tool') {
           // Tool result message
           modelMessages.push({
             role: 'tool',
-            content: [{
-              type: 'tool-result',
-              toolCallId: 'unknown',
-              toolName: 'unknown',
-              output: { value: prompt.content || '' }
-            }]
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'unknown',
+                toolName: 'unknown',
+                output: { value: prompt.content || '' },
+              },
+            ],
           } as ModelMessage)
         } else {
           // Regular text message (user or system)
           modelMessages.push({
             role: role as any,
-            content: prompt.content || ''
+            content: prompt.content || '',
           } as ModelMessage)
         }
       }
@@ -111,19 +132,19 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
               type: 'tool-call',
               toolCallId: tc.id,
               toolName: tc.name,
-              args: tc.arguments
+              args: tc.arguments,
             })
           }
 
           modelMessages.push({
             role: 'assistant',
-            content: parts
+            content: parts,
           } as ModelMessage)
         } else if (completion.content) {
           // Regular completion content
           modelMessages.push({
             role: 'assistant',
-            content: [{ type: 'text', text: completion.content }]
+            content: [{ type: 'text', text: completion.content }],
           } as ModelMessage)
         }
       }
@@ -132,10 +153,17 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
     // Extract prompts from llm attributes
     if (span.llm?.prompt && Array.isArray(span.llm.prompt)) {
       for (const prompt of span.llm.prompt) {
-        const role = prompt.role === 'tool' ? 'tool' : prompt.role as 'system' | 'user' | 'assistant' | 'tool'
+        const role =
+          prompt.role === 'tool'
+            ? 'tool'
+            : (prompt.role as 'system' | 'user' | 'assistant' | 'tool')
 
         // Handle tool calls (assistant with tool calls)
-        if (prompt.tool_calls && Array.isArray(prompt.tool_calls) && role === 'assistant') {
+        if (
+          prompt.tool_calls &&
+          Array.isArray(prompt.tool_calls) &&
+          role === 'assistant'
+        ) {
           const parts: any[] = []
 
           // Add content if present
@@ -149,30 +177,32 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
               type: 'tool-call',
               toolCallId: tc.id,
               toolName: tc.name,
-              args: tc.arguments
+              args: tc.arguments,
             })
           }
 
           modelMessages.push({
             role: 'assistant',
-            content: parts
+            content: parts,
           } as ModelMessage)
         } else if (role === 'tool') {
           // Tool result message
           modelMessages.push({
             role: 'tool',
-            content: [{
-              type: 'tool-result',
-              toolCallId: 'unknown',
-              toolName: 'unknown',
-              output: { value: prompt.content || '' }
-            }]
+            content: [
+              {
+                type: 'tool-result',
+                toolCallId: 'unknown',
+                toolName: 'unknown',
+                output: { value: prompt.content || '' },
+              },
+            ],
           } as ModelMessage)
         } else {
           // Regular text message
           modelMessages.push({
             role: role as any,
-            content: prompt.content || ''
+            content: prompt.content || '',
           } as ModelMessage)
         }
       }
@@ -184,7 +214,7 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
     tools,
     meta: {
       model,
-      metadata
-    }
+      metadata,
+    },
   }
 }

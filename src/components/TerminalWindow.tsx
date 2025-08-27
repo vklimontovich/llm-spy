@@ -1,7 +1,7 @@
 export default function TerminalWindow({
   children,
   enableControls = true,
-  title = "llm-spy-monitor"
+  title = 'llm-spy-monitor',
 }: {
   children: React.ReactNode
   enableControls?: boolean

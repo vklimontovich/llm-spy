@@ -11,19 +11,25 @@ export default function UpstreamsPage() {
   const router = useRouter()
   const params = useParams()
   const api = useWorkspaceApi()
-  
-  const { data: upstreams, isLoading, error } = useQuery({
+
+  const {
+    data: upstreams,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['upstreams'],
     queryFn: async () => {
       const response = await api.get('/upstreams')
       return response.data
-    }
+    },
   })
 
   if (error) {
     return (
       <div className="p-6">
-        <div className="text-red-600">Error loading upstreams: {error.message}</div>
+        <div className="text-red-600">
+          Error loading upstreams: {error.message}
+        </div>
       </div>
     )
   }
@@ -33,7 +39,9 @@ export default function UpstreamsPage() {
       <div className="flex justify-between items-center mb-6">
         <div>
           <h1 className="text-2xl font-bold">Upstreams</h1>
-          <p className="text-gray-600">Manage your upstream proxy configurations</p>
+          <p className="text-gray-600">
+            Manage your upstream proxy configurations
+          </p>
         </div>
         <Button
           type="primary"

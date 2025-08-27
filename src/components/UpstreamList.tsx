@@ -4,7 +4,15 @@ import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'antd'
-import { Activity, Edit3, Hash, Link2, MoreVertical, Server, Trash2 } from 'lucide-react'
+import {
+  Activity,
+  Edit3,
+  Hash,
+  Link2,
+  MoreVertical,
+  Server,
+  Trash2,
+} from 'lucide-react'
 import { useWorkspaceApi } from '@/lib/api'
 
 interface Upstream {
@@ -48,9 +56,9 @@ const UpstreamSkeleton = () => (
 
 // Action Menu Component
 const ActionMenu = ({
-                      onEdit,
-                      onDelete,
-                    }: {
+  onEdit,
+  onDelete,
+}: {
   onEdit: () => void
   onDelete: () => void
 }) => {
@@ -101,10 +109,10 @@ const ActionMenu = ({
 
 // Upstream Card Component
 const UpstreamCard = ({
-                        upstream,
-                        onDelete,
-                        isDeleting,
-                      }: {
+  upstream,
+  onDelete,
+  isDeleting,
+}: {
   upstream: Upstream
   onDelete: () => void
   isDeleting: boolean
@@ -120,11 +128,13 @@ const UpstreamCard = ({
     : 0
 
   return (
-    <div className={`
+    <div
+      className={`
       bg-white rounded-xl border border-gray-200 p-6
       hover:shadow-lg hover:border-blue-200 transition-all duration-200
       ${isDeleting ? 'opacity-50 pointer-events-none' : ''}
-    `}>
+    `}
+    >
       <div className="flex items-start justify-between mb-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-blue-600 rounded-lg flex items-center justify-center shadow-sm">
@@ -151,7 +161,9 @@ const UpstreamCard = ({
           </div>
         </div>
         <ActionMenu
-          onEdit={() => router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)}
+          onEdit={() =>
+            router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)
+          }
           onDelete={onDelete}
         />
       </div>
@@ -161,13 +173,19 @@ const UpstreamCard = ({
           <Button
             type="primary"
             ghost
-            onClick={() => router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)}
+            onClick={() =>
+              router.push(`/${workspaceSlug}/upstreams/${upstream.id}`)
+            }
             icon={<Edit3 className="w-3.5 h-3.5" />}
           >
             Edit
           </Button>
           <Button
-            onClick={() => router.push(`/${workspaceSlug}/requests?upstream=${upstream.name}`)}
+            onClick={() =>
+              router.push(
+                `/${workspaceSlug}/requests?upstream=${upstream.name}`
+              )
+            }
             icon={<Activity className="w-3.5 h-3.5" />}
           >
             View Requests
@@ -176,9 +194,9 @@ const UpstreamCard = ({
 
         <div className="flex items-end gap-1.5 text-xs text-gray-400">
           {upstream.inputFormat && (
-          <span className=" px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-            {upstream.inputFormat.toUpperCase()}
-          </span>
+            <span className=" px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
+              {upstream.inputFormat.toUpperCase()}
+            </span>
           )}
         </div>
       </div>
@@ -192,19 +210,27 @@ const EmptyState = () => (
     <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
       <Server className="w-8 h-8 text-gray-400" />
     </div>
-    <h3 className="text-lg font-semibold text-gray-900 mb-2">No upstreams configured</h3>
-    <p className="text-gray-500 mb-6">Get started by creating your first upstream configuration.</p>
+    <h3 className="text-lg font-semibold text-gray-900 mb-2">
+      No upstreams configured
+    </h3>
+    <p className="text-gray-500 mb-6">
+      Get started by creating your first upstream configuration.
+    </p>
   </div>
 )
 
 // Main Component
-export default function UpstreamList({ upstreams, isLoading }: UpstreamListProps) {
+export default function UpstreamList({
+  upstreams,
+  isLoading,
+}: UpstreamListProps) {
   const queryClient = useQueryClient()
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const api = useWorkspaceApi()
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) => (await api.delete(`/upstreams/${id}`)).data,
+    mutationFn: async (id: string) =>
+      (await api.delete(`/upstreams/${id}`)).data,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
       setDeletingId(null)
@@ -216,7 +242,11 @@ export default function UpstreamList({ upstreams, isLoading }: UpstreamListProps
   })
 
   const handleDelete = (upstream: Upstream) => {
-    if (confirm(`Are you sure you want to delete "${upstream.name}"?\n\nThis action cannot be undone.`)) {
+    if (
+      confirm(
+        `Are you sure you want to delete "${upstream.name}"?\n\nThis action cannot be undone.`
+      )
+    ) {
       setDeletingId(upstream.id)
       deleteMutation.mutate(upstream.id)
     }
@@ -225,7 +255,7 @@ export default function UpstreamList({ upstreams, isLoading }: UpstreamListProps
   if (isLoading) {
     return (
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[1, 2, 3].map((i) => (
+        {[1, 2, 3].map(i => (
           <UpstreamSkeleton key={i} />
         ))}
       </div>
@@ -238,7 +268,7 @@ export default function UpstreamList({ upstreams, isLoading }: UpstreamListProps
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-      {upstreams.map((upstream) => (
+      {upstreams.map(upstream => (
         <UpstreamCard
           key={upstream.id}
           upstream={upstream}

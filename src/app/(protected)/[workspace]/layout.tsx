@@ -1,52 +1,46 @@
 'use client'
 
-import AuthGuard from "@/components/AuthGuard";
-import Logo from "@/components/Logo";
-import { usePathname, useParams } from 'next/navigation';
-import { signOut, useSession } from 'next-auth/react';
-import { Button } from 'antd';
-import {
-  Activity,
-  Network,
-  LogOut,
-  User,
-  ChevronDown,
-  Key
-} from 'lucide-react';
-import { useState } from 'react';
-import Link from 'next/link';
+import AuthGuard from '@/components/AuthGuard'
+import Logo from '@/components/Logo'
+import { usePathname, useParams } from 'next/navigation'
+import { signOut, useSession } from 'next-auth/react'
+import { Button } from 'antd'
+import { Activity, Network, LogOut, User, ChevronDown, Key } from 'lucide-react'
+import { useState } from 'react'
+import Link from 'next/link'
 
 // Navigation Item Component
 const NavItem = ({
   href,
   icon: Icon,
   label,
-  isActive
+  isActive,
 }: {
-  href: string;
-  icon: React.ElementType;
-  label: string;
-  isActive: boolean;
+  href: string
+  icon: React.ElementType
+  label: string
+  isActive: boolean
 }) => (
   <Link href={href}>
     <Button
       type={isActive ? 'primary' : 'text'}
       icon={<Icon className="w-4 h-4" />}
       className={`
-        ${isActive 
-          ? 'bg-gradient-to-r from-blue-500 to-blue-600 border-0 shadow-lg shadow-blue-500/25' 
-          : ''
+        ${
+          isActive
+            ? 'bg-gradient-to-r from-blue-500 to-blue-600 border-0 shadow-lg shadow-blue-500/25'
+            : ''
         }
       `}
     >
       {label}
     </Button>
   </Link>
-);
+)
 
 // User Dropdown Component
 const UserDropdown = ({ session }: { session: any }) => {
-  const [isOpen, setIsOpen] = useState(false);
+  const [isOpen, setIsOpen] = useState(false)
 
   return (
     <div className="relative">
@@ -63,7 +57,9 @@ const UserDropdown = ({ session }: { session: any }) => {
             {session?.user?.email}
           </div>
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+        <ChevronDown
+          className={`w-4 h-4 text-gray-400 transition-transform ${isOpen ? 'rotate-180' : ''}`}
+        />
       </button>
 
       {isOpen && (
@@ -90,34 +86,41 @@ const UserDropdown = ({ session }: { session: any }) => {
         </>
       )}
     </div>
-  );
-};
+  )
+}
 
 export default function ProtectedAuthLayout({
   children,
 }: Readonly<{
-  children: React.ReactNode;
+  children: React.ReactNode
 }>) {
-  const pathname = usePathname();
-  const params = useParams();
-  const { data: session } = useSession();
-
+  const pathname = usePathname()
+  const params = useParams()
+  const { data: session } = useSession()
 
   const isActive = (path: string) => {
     if (path === 'requests') {
-      return pathname === `/${params.workspace}/requests` || pathname === '/';
+      return pathname === `/${params.workspace}/requests` || pathname === '/'
     }
     if (path === 'api keys') {
-      return pathname.includes(`/${params.workspace}/keys`);
+      return pathname.includes(`/${params.workspace}/keys`)
     }
-    return pathname.includes(`/${params.workspace}/${path}`);
-  };
+    return pathname.includes(`/${params.workspace}/${path}`)
+  }
 
   const navItems = [
-    { href: `/${params.workspace}/requests`, icon: Activity, label: 'Requests' },
-    { href: `/${params.workspace}/upstreams`, icon: Network, label: 'Upstreams' },
+    {
+      href: `/${params.workspace}/requests`,
+      icon: Activity,
+      label: 'Requests',
+    },
+    {
+      href: `/${params.workspace}/upstreams`,
+      icon: Network,
+      label: 'Upstreams',
+    },
     { href: `/${params.workspace}/keys`, icon: Key, label: 'API Keys' },
-  ];
+  ]
 
   return (
     <AuthGuard>
@@ -136,7 +139,7 @@ export default function ProtectedAuthLayout({
 
               {/* Navigation */}
               <nav className="flex items-center gap-2">
-                {navItems.map((item) => (
+                {navItems.map(item => (
                   <NavItem
                     key={item.href}
                     href={item.href}
@@ -155,11 +158,9 @@ export default function ProtectedAuthLayout({
 
         {/* Main Content */}
         <main className="w-full min-w-[1024px]">
-          <div className="max-w-[1900px] mx-auto">
-            {children}
-          </div>
+          <div className="max-w-[1900px] mx-auto">{children}</div>
         </main>
       </div>
     </AuthGuard>
-  );
+  )
 }

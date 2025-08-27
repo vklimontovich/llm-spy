@@ -50,7 +50,7 @@ const HeaderRow = ({
   header,
   onChange,
   onRemove,
-  showOverride = true
+  showOverride = true,
 }: {
   header: Header
   onChange: (header: Header) => void
@@ -64,14 +64,14 @@ const HeaderRow = ({
       <input
         type="text"
         value={header.name}
-        onChange={(e) => onChange({ ...header, name: e.target.value })}
+        onChange={e => onChange({ ...header, name: e.target.value })}
         placeholder="Header name"
         className="flex-1 px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
       <input
         type="text"
         value={header.value}
-        onChange={(e) => onChange({ ...header, value: e.target.value })}
+        onChange={e => onChange({ ...header, value: e.target.value })}
         placeholder="Header value"
         className="flex-[2] px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
       />
@@ -81,11 +81,15 @@ const HeaderRow = ({
             <input
               type="checkbox"
               checked={header.override}
-              onChange={(e) => onChange({ ...header, override: e.target.checked })}
+              onChange={e =>
+                onChange({ ...header, override: e.target.checked })
+              }
               className="sr-only peer"
             />
             <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
-            <span className="text-sm text-gray-600 whitespace-nowrap">Override</span>
+            <span className="text-sm text-gray-600 whitespace-nowrap">
+              Override
+            </span>
           </label>
           <div className="relative">
             <button
@@ -98,8 +102,14 @@ const HeaderRow = ({
             </button>
             {showTooltip && (
               <div className="absolute bottom-full right-0 mb-2 w-64 p-3 bg-gray-900 text-white text-xs rounded-lg shadow-xl z-10">
-                <div className="font-semibold mb-1">Override Incoming Headers</div>
-                <p>When enabled, this header will replace any existing header with the same name from the incoming request. When disabled, the header is only added if not already present.</p>
+                <div className="font-semibold mb-1">
+                  Override Incoming Headers
+                </div>
+                <p>
+                  When enabled, this header will replace any existing header
+                  with the same name from the incoming request. When disabled,
+                  the header is only added if not already present.
+                </p>
                 <div className="absolute bottom-0 right-4 transform translate-y-1/2 rotate-45 w-2 h-2 bg-gray-900"></div>
               </div>
             )}
@@ -121,7 +131,7 @@ const HeaderRow = ({
 const Section = ({
   title,
   icon: Icon,
-  children
+  children,
 }: {
   title: string
   icon?: React.ElementType
@@ -134,9 +144,7 @@ const Section = ({
         {title}
       </h2>
     </div>
-    <div className="p-6">
-      {children}
-    </div>
+    <div className="p-6">{children}</div>
   </div>
 )
 
@@ -172,17 +180,21 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     headers: [],
     inputFormat: 'auto',
     outputFormat: null,
-    otelUpstreams: []
+    otelUpstreams: [],
   })
 
-  const { data: upstream, isLoading, error } = useQuery({
+  const {
+    data: upstream,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['upstream', id],
     queryFn: async () => {
       if (isNew) return null
       const response = await api.get(`/upstreams/${id}`)
       return response.data
     },
-    enabled: !isNew
+    enabled: !isNew,
   })
 
   const saveMutation = useMutation({
@@ -193,16 +205,16 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
         headers: data.headers.map(h => ({
           name: h.name,
           value: h.value,
-          priority: h.override ? 'high' as const : 'low' as const
+          priority: h.override ? ('high' as const) : ('low' as const),
         })),
         otelUpstreams: data.otelUpstreams.map(o => ({
           ...o,
           headers: o.headers.map(h => ({
             name: h.name,
             value: h.value,
-            priority: h.override ? 'high' as const : 'low' as const
-          }))
-        }))
+            priority: h.override ? ('high' as const) : ('low' as const),
+          })),
+        })),
       }
 
       if (isNew) {
@@ -216,7 +228,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
       router.push(`/${params.workspace}/upstreams`)
-    }
+    },
   })
 
   useEffect(() => {
@@ -236,28 +248,31 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
           ? upstream.headers.map((h: any) => ({
               name: h.name,
               value: h.value,
-              override: h.priority === 'high'
+              override: h.priority === 'high',
             }))
           : Object.entries(upstream.headers || {}).map(([name, value]) => ({
               name,
               value: String(value),
-              override: false
+              override: false,
             })),
-        otelUpstreams: upstream.otelUpstreams?.map((collector: any) => ({
-          id: collector.id,
-          url: collector.url,
-          headers: Array.isArray(collector.headers)
-            ? collector.headers.map((h: any) => ({
-                name: h.name,
-                value: h.value,
-                override: h.priority === 'high'
-              }))
-            : Object.entries(collector.headers || {}).map(([name, value]) => ({
-                name,
-                value: String(value),
-                override: false
-              }))
-        })) || []
+        otelUpstreams:
+          upstream.otelUpstreams?.map((collector: any) => ({
+            id: collector.id,
+            url: collector.url,
+            headers: Array.isArray(collector.headers)
+              ? collector.headers.map((h: any) => ({
+                  name: h.name,
+                  value: h.value,
+                  override: h.priority === 'high',
+                }))
+              : Object.entries(collector.headers || {}).map(
+                  ([name, value]) => ({
+                    name,
+                    value: String(value),
+                    override: false,
+                  })
+                ),
+          })) || [],
       })
     }
   }, [upstream])
@@ -270,7 +285,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   const addHeader = () => {
     setFormData({
       ...formData,
-      headers: [...formData.headers, { name: '', value: '', override: false }]
+      headers: [...formData.headers, { name: '', value: '', override: false }],
     })
   }
 
@@ -283,14 +298,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   const removeHeader = (index: number) => {
     setFormData({
       ...formData,
-      headers: formData.headers.filter((_, i) => i !== index)
+      headers: formData.headers.filter((_, i) => i !== index),
     })
   }
 
   const addOtelCollector = () => {
     setFormData({
       ...formData,
-      otelUpstreams: [...formData.otelUpstreams, { url: '', headers: [] }]
+      otelUpstreams: [...formData.otelUpstreams, { url: '', headers: [] }],
     })
   }
 
@@ -303,10 +318,9 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   const removeOtelCollector = (index: number) => {
     setFormData({
       ...formData,
-      otelUpstreams: formData.otelUpstreams.filter((_, i) => i !== index)
+      otelUpstreams: formData.otelUpstreams.filter((_, i) => i !== index),
     })
   }
-
 
   if (isLoading) return <LoadingState />
   if (error) return <ErrorState message={(error as Error).message} />
@@ -317,8 +331,8 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
         {/* Connection Instructions */}
         {!isNew && formData.name && (
           <div className="mb-6">
-            <ConnectionInstructions 
-              workspaceSlug={params.workspace as string} 
+            <ConnectionInstructions
+              workspaceSlug={params.workspace as string}
               upstreamName={formData.name}
               compact={false}
             />
@@ -336,7 +350,9 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 type="text"
                 required
                 value={formData.name}
-                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                onChange={e =>
+                  setFormData({ ...formData, name: e.target.value })
+                }
                 placeholder="Production Upstream"
                 className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -348,12 +364,12 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
               </label>
               <Select
                 value={formData.inputFormat}
-                onChange={(value) => {
+                onChange={value => {
                   setFormData({
                     ...formData,
                     inputFormat: value,
                     // Auto-suggest URL if it's empty
-                    url: formData.url
+                    url: formData.url,
                   })
                 }}
                 options={[
@@ -383,11 +399,12 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                     Not available for OpenTelemetry
                   </p>
                   <p className="text-xs text-gray-600 max-w-sm">
-                    OpenTelemetry data is processed asynchronously and cannot be forwarded to LLM backends
+                    OpenTelemetry data is processed asynchronously and cannot be
+                    forwarded to LLM backends
                   </p>
                 </div>
               </div>
-              
+
               {/* Disabled form fields underneath */}
               <div className="flex flex-col gap-4 opacity-30 pointer-events-none">
                 <div>
@@ -410,9 +427,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                   <Select
                     value={formData.outputFormat || ''}
                     disabled
-                    options={[
-                      { value: '', label: 'Same as input' },
-                    ]}
+                    options={[{ value: '', label: 'Same as input' }]}
                     className="w-full"
                     size="large"
                   />
@@ -431,11 +446,15 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 <input
                   type="url"
                   value={formData.url}
-                  onChange={(e) => setFormData({ ...formData, url: e.target.value })}
+                  onChange={e =>
+                    setFormData({ ...formData, url: e.target.value })
+                  }
                   placeholder={
-                    formData.inputFormat === 'anthropic' ? "https://api.anthropic.com" :
-                    formData.inputFormat === 'openai' ? "https://api.openai.com" :
-                    "https://api.example.com"
+                    formData.inputFormat === 'anthropic'
+                      ? 'https://api.anthropic.com'
+                      : formData.inputFormat === 'openai'
+                        ? 'https://api.openai.com'
+                        : 'https://api.example.com'
                   }
                   className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                 />
@@ -447,7 +466,9 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 </label>
                 <Select
                   value={formData.outputFormat || ''}
-                  onChange={(value) => setFormData({ ...formData, outputFormat: value || null })}
+                  onChange={value =>
+                    setFormData({ ...formData, outputFormat: value || null })
+                  }
                   options={[
                     { value: '', label: 'Same as input' },
                     { value: 'anthropic', label: 'Anthropic' },
@@ -472,13 +493,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 <HeaderRow
                   key={index}
                   header={header}
-                  onChange={(h) => updateHeader(index, h)}
+                  onChange={h => updateHeader(index, h)}
                   onRemove={() => removeHeader(index)}
                 />
               ))
             ) : (
               <p className="text-gray-500 text-sm py-4 text-center">
-                No headers configured. Headers can be used to add authentication or modify requests.
+                No headers configured. Headers can be used to add authentication
+                or modify requests.
               </p>
             )}
 
@@ -498,7 +520,10 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
           <div className="flex flex-col gap-4">
             {formData.otelUpstreams.length > 0 ? (
               formData.otelUpstreams.map((collector, collectorIndex) => (
-                <div key={collectorIndex} className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+                <div
+                  key={collectorIndex}
+                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
+                >
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-medium text-gray-900">
                       Collector {collectorIndex + 1}
@@ -516,25 +541,40 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                       type="url"
                       required
                       value={collector.url}
-                      onChange={(e) => updateOtelCollector(collectorIndex, { ...collector, url: e.target.value })}
+                      onChange={e =>
+                        updateOtelCollector(collectorIndex, {
+                          ...collector,
+                          url: e.target.value,
+                        })
+                      }
                       placeholder="https://otel-collector.example.com:4318"
                       className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                     />
 
                     <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-gray-700">Headers</label>
+                      <label className="text-sm font-medium text-gray-700">
+                        Headers
+                      </label>
                       {collector.headers.map((header, headerIndex) => (
                         <HeaderRow
                           key={headerIndex}
                           header={header}
-                          onChange={(h) => {
+                          onChange={h => {
                             const newHeaders = [...collector.headers]
                             newHeaders[headerIndex] = h
-                            updateOtelCollector(collectorIndex, { ...collector, headers: newHeaders })
+                            updateOtelCollector(collectorIndex, {
+                              ...collector,
+                              headers: newHeaders,
+                            })
                           }}
                           onRemove={() => {
-                            const newHeaders = collector.headers.filter((_, i) => i !== headerIndex)
-                            updateOtelCollector(collectorIndex, { ...collector, headers: newHeaders })
+                            const newHeaders = collector.headers.filter(
+                              (_, i) => i !== headerIndex
+                            )
+                            updateOtelCollector(collectorIndex, {
+                              ...collector,
+                              headers: newHeaders,
+                            })
                           }}
                           showOverride={false}
                         />
@@ -543,8 +583,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                       <Button
                         size="small"
                         onClick={() => {
-                          const newHeaders = [...collector.headers, { name: '', value: '', override: false }]
-                          updateOtelCollector(collectorIndex, { ...collector, headers: newHeaders })
+                          const newHeaders = [
+                            ...collector.headers,
+                            { name: '', value: '', override: false },
+                          ]
+                          updateOtelCollector(collectorIndex, {
+                            ...collector,
+                            headers: newHeaders,
+                          })
                         }}
                         icon={<Plus className="w-3 h-3" />}
                       >
@@ -556,7 +602,8 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
               ))
             ) : (
               <p className="text-gray-500 text-sm py-4 text-center">
-                No OpenTelemetry collectors configured. Add collectors to send telemetry data.
+                No OpenTelemetry collectors configured. Add collectors to send
+                telemetry data.
               </p>
             )}
 

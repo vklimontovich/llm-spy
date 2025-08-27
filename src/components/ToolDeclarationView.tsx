@@ -8,8 +8,6 @@ import { Tool } from 'ai'
 
 const { Text } = Typography
 
-
-
 interface ToolDeclarationViewProps {
   tools: Tool[]
 }
@@ -21,7 +19,7 @@ const getParametersObject = (tool: Tool): any => {
     // 1. A Zod schema (has _def property)
     // 2. A Schema object (has jsonSchema property)
     // 3. A custom validator
-    
+
     // Check if it's a Schema object with jsonSchema
     if ('jsonSchema' in tool.inputSchema && tool.inputSchema.jsonSchema) {
       const jsonSchema = tool.inputSchema.jsonSchema
@@ -30,14 +28,14 @@ const getParametersObject = (tool: Tool): any => {
       const { $schema, ...schemaWithoutMeta } = jsonSchema as any
       return schemaWithoutMeta
     }
-    
+
     // For Zod schemas or other types, we can't easily extract the schema
     // Return a placeholder or try to describe it
     if ('_def' in tool.inputSchema) {
       // It's a Zod schema - we can't easily convert it to JSON schema
       return { type: 'zod-schema', description: 'Complex schema' }
     }
-    
+
     return tool.inputSchema
   }
 
@@ -67,8 +65,9 @@ const getParametersObject = (tool: Tool): any => {
   return null
 }
 
-
-export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps) {
+export default function ToolDeclarationView({
+  tools,
+}: ToolDeclarationViewProps) {
   if (!tools || tools.length === 0) {
     return <Text className="text-gray-500">No tools declared</Text>
   }
@@ -77,22 +76,28 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
     // Get tool name - it's in the 'name' property for provider-defined tools
     // For other tools, we might need to generate a name or use index
     const toolName = (tool as any).name || `Tool ${index + 1}`
-    
+
     return {
       key: `tool-${index}`,
       label: (
         <div className="flex items-center gap-2">
           <ToolOutlined className="text-blue-500" />
-          <Text strong className="text-base">{toolName}</Text>
+          <Text strong className="text-base">
+            {toolName}
+          </Text>
         </div>
       ),
       children: (
         <div className="space-y-4">
           {tool.description && (
             <div>
-              <Text strong className="text-sm">Description:</Text>
+              <Text strong className="text-sm">
+                Description:
+              </Text>
               <div className="mt-1 p-3 bg-gray-50 rounded">
-                <Text className="text-xs whitespace-pre-wrap">{tool.description}</Text>
+                <Text className="text-xs whitespace-pre-wrap">
+                  {tool.description}
+                </Text>
               </div>
             </div>
           )}
@@ -106,7 +111,9 @@ export default function ToolDeclarationView({ tools }: ToolDeclarationViewProps)
               <div>
                 <div className="flex items-center gap-2 mb-2">
                   <CodeOutlined className="text-green-500" />
-                  <Text strong className="text-sm">Parameters:</Text>
+                  <Text strong className="text-sm">
+                    Parameters:
+                  </Text>
                 </div>
                 <JsonView data={paramsObj} simple />
               </div>

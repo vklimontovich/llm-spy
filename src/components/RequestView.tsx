@@ -38,10 +38,12 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
         <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4">
           <MessageSquare className="w-8 h-8 text-gray-400" />
         </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">No Conversation Data</h3>
+        <h3 className="text-lg font-semibold text-gray-900 mb-2">
+          No Conversation Data
+        </h3>
         <p className="text-gray-500 text-center max-w-md">
-          This request does not appear to be an AI conversation.
-          Check the Raw Request and Raw Response tabs for details.
+          This request does not appear to be an AI conversation. Check the Raw
+          Request and Raw Response tabs for details.
         </p>
       </div>
     )
@@ -65,9 +67,7 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
           style={{ backgroundColor: '#52c41a' }}
         />
       ),
-      children: (
-        <ChatView messages={conversation.modelMessages} />
-      ),
+      children: <ChatView messages={conversation.modelMessages} />,
     })
   }
 
@@ -156,7 +156,10 @@ const RequestTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
         </div>
       ),
       extra: llmRequest?.rawRequest?.headers?.['content-type'] && (
-        <Text code className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded">
+        <Text
+          code
+          className="text-xs bg-blue-50 text-blue-600 px-2 py-0.5 rounded"
+        >
           {llmRequest.rawRequest.headers['content-type']}
         </Text>
       ),
@@ -217,7 +220,10 @@ const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
         </div>
       ),
       extra: llmRequest?.rawResponse?.headers?.['content-type'] && (
-        <Text code className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded">
+        <Text
+          code
+          className="text-xs bg-green-50 text-green-600 px-2 py-0.5 rounded"
+        >
           {llmRequest.rawResponse.headers['content-type']}
         </Text>
       ),
@@ -283,24 +289,30 @@ const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
 })
 ResponseTab.displayName = 'ResponseTab'
 
-export default function RequestView({ requestId, workspaceId }: RequestViewProps) {
+export default function RequestView({
+  requestId,
+  workspaceId,
+}: RequestViewProps) {
   const searchParams = useSearchParams()
 
   // Get tab from URL params, default to 'chat'
   const tabFromUrl = searchParams.get('tab')
   const validTabs = ['chat', 'request', 'response']
-  const currentTab = tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
+  const currentTab =
+    tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
 
   // Fetch combined data (request, response, and conversation)
   const { data: combinedData, isLoading } = useQuery({
     queryKey: ['body', requestId, 'combined'],
     queryFn: async () => {
-      const config = workspaceId ? {
-        params: { id: requestId },
-        headers: { 'X-Workspace-Id': workspaceId }
-      } : {
-        params: { id: requestId }
-      }
+      const config = workspaceId
+        ? {
+            params: { id: requestId },
+            headers: { 'X-Workspace-Id': workspaceId },
+          }
+        : {
+            params: { id: requestId },
+          }
       const response = await axios.get('/api/body', config)
       return response.data
     },

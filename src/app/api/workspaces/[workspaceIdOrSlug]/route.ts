@@ -15,12 +15,8 @@ export async function GET(
 
     const workspace = await prisma.workspace.findFirst({
       where: {
-        OR: [
-          { id: workspaceIdOrSlug },
-          { slug: workspaceIdOrSlug }
-        ],
-        users: { some: { user: { email } }
-        }
+        OR: [{ id: workspaceIdOrSlug }, { slug: workspaceIdOrSlug }],
+        users: { some: { user: { email } } },
       },
       select: {
         id: true,
@@ -31,14 +27,14 @@ export async function GET(
         users: {
           where: {
             user: {
-              email
-            }
+              email,
+            },
           },
           select: {
-            role: true
-          }
-        }
-      }
+            role: true,
+          },
+        },
+      },
     })
 
     if (!workspace) {
@@ -54,13 +50,10 @@ export async function GET(
       name: workspace.name,
       role: workspace.users[0]?.role || 'member',
       createdAt: workspace.createdAt,
-      updatedAt: workspace.updatedAt
+      updatedAt: workspace.updatedAt,
     })
   } catch (error) {
     console.error('Error fetching workspace:', error)
-    return Response.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return Response.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

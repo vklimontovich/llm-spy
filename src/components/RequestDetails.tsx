@@ -15,17 +15,15 @@ interface RequestDetailsProps {
 export default function RequestDetails({
   selectedRequest,
   onClose,
-  showShare = false
+  showShare = false,
 }: RequestDetailsProps) {
   const { workspace } = useWorkspace()
-  
+
   const title = (
     <div className="flex items-center justify-between">
       <span>Request/Response Details</span>
       {showShare && selectedRequest && (
-        <ShareButton 
-          requestId={selectedRequest.id} 
-        />
+        <ShareButton requestId={selectedRequest.id} />
       )}
     </div>
   )
@@ -39,7 +37,7 @@ export default function RequestDetails({
       onClose={onClose}
     >
       {selectedRequest && (
-        <RequestView 
+        <RequestView
           requestId={selectedRequest.id}
           workspaceId={workspace.id}
         />

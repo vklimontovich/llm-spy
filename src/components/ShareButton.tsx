@@ -37,14 +37,16 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
 
   const toggleShareMutation = useMutation({
     mutationFn: async (makePublic: boolean) => {
-      const response = await api.post(`/requests/${requestId}/share`, { public: makePublic })
+      const response = await api.post(`/requests/${requestId}/share`, {
+        public: makePublic,
+      })
       return response.data
     },
     onSuccess: () => {
       // Invalidate both the share status and the requests list
       queryClient.invalidateQueries({ queryKey: ['share-status', requestId] })
       queryClient.invalidateQueries({ queryKey: ['requests'] })
-    }
+    },
   })
 
   const copyShareLink = () => {
@@ -59,11 +61,7 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
   if (isLoading) {
     return (
       <div className="flex flex-col items-end gap-1">
-        <Button
-          size="large"
-          disabled
-          icon={<Lock className="w-4 h-4" />}
-        >
+        <Button size="large" disabled icon={<Lock className="w-4 h-4" />}>
           Sharing Settings
         </Button>
         <div className="h-5" /> {/* Placeholder to prevent layout shift */}
@@ -74,9 +72,15 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
   return (
     <div className="flex flex-col items-end gap-1">
       <Button
-        type={isShared ? "default" : "primary"}
+        type={isShared ? 'default' : 'primary'}
         size="large"
-        icon={isShared ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+        icon={
+          isShared ? (
+            <Lock className="w-4 h-4" />
+          ) : (
+            <Unlock className="w-4 h-4" />
+          )
+        }
         onClick={() => toggleShareMutation.mutate(!isShared)}
         loading={toggleShareMutation.isPending}
       >
@@ -84,7 +88,7 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
       </Button>
       <a
         href="#"
-        onClick={(e) => {
+        onClick={e => {
           e.preventDefault()
           copyShareLink()
         }}

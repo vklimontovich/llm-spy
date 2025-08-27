@@ -10,7 +10,7 @@ export function isDisplayable(contentType: string | null): boolean {
     'text/css',
     'text/javascript',
     'text/event-stream',
-    'application/x-protobuf'
+    'application/x-protobuf',
   ]
   return displayableTypes.some(type => contentType.startsWith(type))
 }
@@ -21,7 +21,7 @@ export function formatJson(input: any): string {
       const parsed = JSON.parse(input)
       return JSON.stringify(parsed, null, 2)
     } catch {
-      return input;
+      return input
     }
   } else if (typeof input === 'object' && input !== null) {
     return JSON.stringify(input, null, 2)
@@ -33,7 +33,6 @@ export function formatJson(input: any): string {
 // Re-export for backwards compatibility
 export { convertProtobufToJson }
 
-
 export function formatBytes(bytes: number): string {
   if (bytes === 0) return '0'
   const k = 1024
@@ -42,15 +41,20 @@ export function formatBytes(bytes: number): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i]
 }
 
-
 export function assembleStreamingResponse(data: string): PromptItem[] {
   if (!data) return []
 
   try {
     // Parse Server-Sent Events format
     const events = data.split('\n\n').filter(event => event.trim())
-    const messages: { [key: string]: { role: string; content: string; model?: string } } = {}
-    const contentBlocks: { [messageId: string]: { [index: number]: { type: string; content: string; toolName?: string } } } = {}
+    const messages: {
+      [key: string]: { role: string; content: string; model?: string }
+    } = {}
+    const contentBlocks: {
+      [messageId: string]: {
+        [index: number]: { type: string; content: string; toolName?: string }
+      }
+    } = {}
 
     for (const event of events) {
       const lines = event.split('\n')
@@ -74,7 +78,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
               messages[messageId] = {
                 role: parsed.message.role || 'assistant',
                 content: '',
-                model: parsed.message.model
+                model: parsed.message.model,
               }
               contentBlocks[messageId] = {}
             }
@@ -88,7 +92,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
                 contentBlocks[messageId][index] = {
                   type: parsed.content_block.type,
                   content: '',
-                  toolName: parsed.content_block.name
+                  toolName: parsed.content_block.name,
                 }
               }
             }
@@ -99,13 +103,20 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
             if (messageId) {
               const index = parsed.index || 0
               if (!contentBlocks[messageId][index]) {
-                contentBlocks[messageId][index] = { type: 'unknown', content: '' }
+                contentBlocks[messageId][index] = {
+                  type: 'unknown',
+                  content: '',
+                }
               }
 
               if (parsed.delta && parsed.delta.type === 'text_delta') {
                 contentBlocks[messageId][index].content += parsed.delta.text
-              } else if (parsed.delta && parsed.delta.type === 'input_json_delta') {
-                contentBlocks[messageId][index].content += parsed.delta.partial_json
+              } else if (
+                parsed.delta &&
+                parsed.delta.type === 'input_json_delta'
+              ) {
+                contentBlocks[messageId][index].content +=
+                  parsed.delta.partial_json
               }
             }
             break
@@ -135,8 +146,10 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
         // No content blocks, use message content if available
         if (message.content) {
           result.push({
-            role: message.model ? `${message.role} (${message.model})` : message.role,
-            content: message.content
+            role: message.model
+              ? `${message.role} (${message.model})`
+              : message.role,
+            content: message.content,
           })
         }
       } else {
@@ -145,7 +158,9 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
           const block = blocks[index]
           if (block.content) {
             let content = block.content
-            let role = message.model ? `${message.role} (${message.model})` : message.role
+            let role = message.model
+              ? `${message.role} (${message.model})`
+              : message.role
 
             // Format tool use content
             if (block.type === 'tool_use' && block.toolName) {
@@ -161,7 +176,7 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
 
             result.push({
               role,
-              content
+              content,
             })
           }
         }
@@ -174,7 +189,10 @@ export function assembleStreamingResponse(data: string): PromptItem[] {
   }
 }
 
-export function detectLLMResponse(body: string, contentType: string | null): boolean {
+export function detectLLMResponse(
+  body: string,
+  contentType: string | null
+): boolean {
   if (!body) return false
 
   // Ensure body is a string
@@ -182,7 +200,10 @@ export function detectLLMResponse(body: string, contentType: string | null): boo
 
   // Check for streaming format
   if (contentType?.includes('text/event-stream')) {
-    return bodyStr.includes('message_start') || bodyStr.includes('content_block_delta')
+    return (
+      bodyStr.includes('message_start') ||
+      bodyStr.includes('content_block_delta')
+    )
   }
 
   // Check for regular JSON response
@@ -210,7 +231,10 @@ export function detectLLMResponse(body: string, contentType: string | null): boo
   }
 }
 
-export function extractResponsePrompts(body: string, contentType: string | null): PromptItem[] {
+export function extractResponsePrompts(
+  body: string,
+  contentType: string | null
+): PromptItem[] {
   if (!body) return []
 
   // Ensure body is a string
@@ -232,7 +256,7 @@ export function extractResponsePrompts(body: string, contentType: string | null)
         if (choice.message) {
           prompts.push({
             role: choice.message.role || 'assistant',
-            content: choice.message.content || ''
+            content: choice.message.content || '',
           })
         }
       }
@@ -244,7 +268,7 @@ export function extractResponsePrompts(body: string, contentType: string | null)
         if (content.type === 'text' && content.text) {
           prompts.push({
             role: parsed.role || 'assistant',
-            content: content.text
+            content: content.text,
           })
         }
       }
@@ -254,7 +278,10 @@ export function extractResponsePrompts(body: string, contentType: string | null)
     if (parsed.role && parsed.content) {
       prompts.push({
         role: parsed.role,
-        content: typeof parsed.content === 'string' ? parsed.content : JSON.stringify(parsed.content)
+        content:
+          typeof parsed.content === 'string'
+            ? parsed.content
+            : JSON.stringify(parsed.content),
       })
     }
 
@@ -287,8 +314,8 @@ export function detectLLMRequest(body: string): boolean {
 
     // Check for content array structure
     if (parsed.content && Array.isArray(parsed.content)) {
-      return parsed.content.some((item: any) =>
-        item.type === 'text' || item.type === 'image'
+      return parsed.content.some(
+        (item: any) => item.type === 'text' || item.type === 'image'
       )
     }
 
@@ -339,14 +366,14 @@ export function extractPrompts(body: string): PromptItem[] {
       if (typeof parsed.system === 'string') {
         prompts.push({
           role: 'system',
-          content: parsed.system
+          content: parsed.system,
         })
       } else if (Array.isArray(parsed.system)) {
         for (const systemItem of parsed.system) {
           if (systemItem.type === 'text' && systemItem.text) {
             prompts.push({
               role: 'system',
-              content: systemItem.text
+              content: systemItem.text,
             })
           }
         }
@@ -359,7 +386,7 @@ export function extractPrompts(body: string): PromptItem[] {
         if (typeof message.content === 'string') {
           prompts.push({
             role: message.role || 'unknown',
-            content: message.content
+            content: message.content,
           })
         } else if (Array.isArray(message.content)) {
           // Group array content under the same role
@@ -368,20 +395,20 @@ export function extractPrompts(body: string): PromptItem[] {
             if (content.type === 'text' && content.text) {
               contentItems.push({
                 type: 'text',
-                content: content.text
+                content: content.text,
               })
             } else if (content.type === 'tool_use') {
               contentItems.push({
                 type: 'tool_use',
                 toolName: content.name,
                 toolId: content.id,
-                content: content.input
+                content: content.input,
               })
             } else if (content.type === 'tool_result') {
               contentItems.push({
                 type: 'tool_result',
                 toolId: content.tool_use_id,
-                content: content.content || content.output
+                content: content.content || content.output,
               })
             }
           }
@@ -390,7 +417,7 @@ export function extractPrompts(body: string): PromptItem[] {
             prompts.push({
               role: message.role || 'unknown',
               content: contentItems,
-              type: 'text'
+              type: 'text',
             })
           }
         }
@@ -404,14 +431,14 @@ export function extractPrompts(body: string): PromptItem[] {
         if (content.type === 'text' && content.text) {
           contentItems.push({
             type: 'text',
-            content: content.text
+            content: content.text,
           })
         } else if (content.type === 'tool_use') {
           contentItems.push({
             type: 'tool_use',
             toolName: content.name,
             toolId: content.id,
-            content: content.input
+            content: content.input,
           })
         }
       }
@@ -420,7 +447,7 @@ export function extractPrompts(body: string): PromptItem[] {
         prompts.push({
           role: parsed.role || 'assistant',
           content: contentItems,
-          type: 'text'
+          type: 'text',
         })
       }
     }
@@ -429,7 +456,7 @@ export function extractPrompts(body: string): PromptItem[] {
     if (typeof parsed.prompt === 'string') {
       prompts.push({
         role: 'prompt',
-        content: parsed.prompt
+        content: parsed.prompt,
       })
     }
 

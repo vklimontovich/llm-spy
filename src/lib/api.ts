@@ -17,4 +17,3 @@ export function useWorkspaceApi(): AxiosInstance {
     return client
   }, [workspace.id])
 }
-
