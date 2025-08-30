@@ -3,6 +3,16 @@ import type { SSEEvent } from '@/lib/sse-utils'
 
 export type ConversationModel = {
   modelMessages: ModelMessage[]
+  models: {
+    request: string
+    response?: string
+  }
+
+  usage?: {
+    inputTokens: number
+    outputTokens: number
+  }
+
   tools: Tool[]
   meta: {
     model: string

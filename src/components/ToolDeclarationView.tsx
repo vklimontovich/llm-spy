@@ -77,14 +77,29 @@ export default function ToolDeclarationView({
     // For other tools, we might need to generate a name or use index
     const toolName = (tool as any).name || `Tool ${index + 1}`
 
+    // Get description preview - replace newlines with spaces and truncate
+    const getDescriptionPreview = () => {
+      if (!tool.description) return null
+      const cleaned = tool.description.replace(/\n+/g, ' ').trim()
+      // Truncate to 1000 chars to avoid too much DOM content
+      return cleaned.length > 1000 ? cleaned.substring(0, 1000) : cleaned
+    }
+
+    const descriptionPreview = getDescriptionPreview()
+
     return {
       key: `tool-${index}`,
       label: (
-        <div className="flex items-center gap-2">
-          <ToolOutlined className="text-blue-500" />
-          <Text strong className="text-base">
+        <div className="flex items-center gap-2 flex-1 min-w-0">
+          <ToolOutlined className="text-blue-500 flex-shrink-0" />
+          <Text strong className="text-base flex-shrink-0">
             {toolName}
           </Text>
+          {descriptionPreview && (
+            <span className="text-xs text-gray-400 ml-3 line-clamp-1 flex-1">
+              {descriptionPreview}
+            </span>
+          )}
         </div>
       ),
       children: (

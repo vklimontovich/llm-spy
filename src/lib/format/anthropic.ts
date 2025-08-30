@@ -12,6 +12,12 @@ const AnthropicTextPart = z.object({
   text: z.string(),
 })
 
+const AnthropicThinkingPart = z.object({
+  type: z.literal('thinking'),
+  thinking: z.string(),
+  signature: z.string().optional(),
+})
+
 const AnthropicToolUsePart = z.object({
   type: z.literal('tool_use'),
   id: z.string().optional(),
@@ -28,6 +34,7 @@ const AnthropicToolResultPart = z.object({
 
 const AnthropicContentPart = z.discriminatedUnion('type', [
   AnthropicTextPart,
+  AnthropicThinkingPart,
   AnthropicToolUsePart,
   AnthropicToolResultPart,
   // add image/file parts here if needed
@@ -44,9 +51,14 @@ const AnthropicToolDef = z.object({
   input_schema: z.record(z.string(), z.any()).optional(),
 })
 
+const AnthropicSystemMessage = z.object({
+  role: z.literal('system'),
+  content: z.string(),
+})
+
 export const AnthropicWireSchema = z.object({
   model: z.string(),
-  messages: z.array(AnthropicMessage),
+  messages: z.array(z.union([AnthropicMessage, AnthropicSystemMessage])),
   system: z
     .union([
       z.string(),
@@ -67,6 +79,7 @@ export const AnthropicWireSchema = z.object({
   metadata: z.unknown().optional(),
   max_tokens: z.number().optional(),
   stream: z.boolean().optional(),
+  temperature: z.number().nullable().optional(),
 })
 
 export type AnthropicWire = z.infer<typeof AnthropicWireSchema>
@@ -81,6 +94,12 @@ export function anthropicToModel(
 
   // Track tool calls by ID for name resolution
   const toolCallMap = new Map<string, string>() // toolCallId -> toolName
+
+  // Extract model names and usage
+  const models: { request: string; response?: string } = {
+    request: payload.model,
+  }
+  let usage: { inputTokens: number; outputTokens: number } | undefined
 
   // 1) Top-level system - handle multiple system messages
   if (payload.system) {
@@ -115,6 +134,16 @@ export function anthropicToModel(
     messageIndex++
   ) {
     const m = payload.messages[messageIndex]
+
+    // Handle system messages in messages array
+    if ('role' in m && m.role === 'system' && typeof m.content === 'string') {
+      out.push({
+        role: 'system',
+        content: m.content,
+        providerOptions: { originalMessageGroup: String(messageIndex) },
+      } as unknown as ModelMessage)
+      continue
+    }
 
     // Handle string content (common in user messages)
     if (typeof m.content === 'string') {
@@ -165,6 +194,10 @@ export function anthropicToModel(
       typeof AnthropicTextPart
     >[]
 
+    const thinkingParts = parts.filter(p => p.type === 'thinking') as z.infer<
+      typeof AnthropicThinkingPart
+    >[]
+
     if (m.role === 'user') {
       if (textParts.length > 0) {
         const content =
@@ -185,6 +218,10 @@ export function anthropicToModel(
       >[]
 
       const assistantContent: any[] = [
+        ...thinkingParts.map(tp => ({
+          type: 'text' as const,
+          text: `[Thinking]\n${tp.thinking}`,
+        })),
         ...textParts.map(tp => ({ type: 'text' as const, text: tp.text })),
         ...toolUses.map(tu => {
           const toolCallId = tu.id || `tool-${Date.now()}`
@@ -215,6 +252,17 @@ export function anthropicToModel(
   if (responseUnknown && typeof responseUnknown === 'object') {
     const response = responseUnknown as any
 
+    // Extract response model and usage
+    if (response.model) {
+      models.response = response.model
+    }
+    if (response.usage) {
+      usage = {
+        inputTokens: response.usage.input_tokens || 0,
+        outputTokens: response.usage.output_tokens || 0,
+      }
+    }
+
     // Check if this is an Anthropic assistant message
     if (response.role === 'assistant' && response.content) {
       const assistantContent: any[] = []
@@ -228,6 +276,11 @@ export function anthropicToModel(
             assistantContent.push({
               type: 'text' as const,
               text: part.text || '',
+            })
+          } else if (part.type === 'thinking') {
+            assistantContent.push({
+              type: 'text' as const,
+              text: `[Thinking]\n${part.thinking || ''}`,
             })
           } else if (part.type === 'tool_use') {
             const toolCallId = part.id || `tool-${Date.now()}`
@@ -267,6 +320,8 @@ export function anthropicToModel(
 
   return {
     modelMessages: out,
+    models,
+    usage,
     tools,
     meta: {
       model: payload.model,
@@ -320,6 +375,20 @@ export class AnthropicParser implements ProviderParser {
   private responseToModel(responseUnknown: unknown): ConversationModel {
     const response = responseUnknown as any
     const out: ModelMessage[] = []
+    const models: { request: string; response?: string } = {
+      request: response.model || 'unknown',
+    }
+    let usage: { inputTokens: number; outputTokens: number } | undefined
+
+    if (response.model) {
+      models.response = response.model
+    }
+    if (response.usage) {
+      usage = {
+        inputTokens: response.usage.input_tokens || 0,
+        outputTokens: response.usage.output_tokens || 0,
+      }
+    }
 
     if (response.role === 'assistant' && response.content) {
       const assistantContent: any[] = []
@@ -332,6 +401,11 @@ export class AnthropicParser implements ProviderParser {
             assistantContent.push({
               type: 'text' as const,
               text: part.text || '',
+            })
+          } else if (part.type === 'thinking') {
+            assistantContent.push({
+              type: 'text' as const,
+              text: `[Thinking]\n${part.thinking || ''}`,
             })
           } else if (part.type === 'tool_use') {
             assistantContent.push({
@@ -355,6 +429,8 @@ export class AnthropicParser implements ProviderParser {
 
     return {
       modelMessages: out,
+      models,
+      usage,
       tools: [],
       meta: {
         model: response.model || 'unknown',
@@ -413,8 +489,8 @@ export class AnthropicParser implements ProviderParser {
       stop_reason: 'end_turn',
       stop_sequence: null,
       usage: {
-        input_tokens: 0,
-        output_tokens: 0,
+        input_tokens: conversation.usage?.inputTokens || 0,
+        output_tokens: conversation.usage?.outputTokens || 0,
       },
     }
   }

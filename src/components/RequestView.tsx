@@ -20,8 +20,9 @@ import JsonView from './JsonView'
 import SmartContentView from './SmartContentView'
 import { LlmRequest } from '@/lib/route-types'
 import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
-import { getProviderByName } from '@/lib/format'
 import axios from 'axios'
+import { getParserForProvider } from '@/lib/format'
+import { requireDefined } from '@/lib/preconditions'
 
 const { Text } = Typography
 
@@ -244,7 +245,10 @@ const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
     const events = parseSSEEvents(llmRequest.rawResponse.body)
     let eventsToDisplay
     if (llmRequest.provider) {
-      const provider = getProviderByName(llmRequest.provider)
+      const provider = requireDefined(
+        getParserForProvider(llmRequest.provider),
+        `No parser found for provider ${llmRequest.provider}`
+      )
       if (provider) {
         eventsToDisplay = provider.parseSSE(events)
       }

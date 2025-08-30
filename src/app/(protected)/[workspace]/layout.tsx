@@ -112,7 +112,7 @@ export default function ProtectedAuthLayout({
     {
       href: `/${params.workspace}/requests`,
       icon: Activity,
-      label: 'Requests',
+      label: 'LLM Calls',
     },
     {
       href: `/${params.workspace}/upstreams`,

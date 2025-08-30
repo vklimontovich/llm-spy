@@ -1,80 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { gunzip, inflate, brotliDecompress } from 'zlib'
-import { promisify } from 'util'
-import { HttpError } from '@/lib/route-helpers'
-
-const gunzipAsync = promisify(gunzip)
-const inflateAsync = promisify(inflate)
-const brotliDecompressAsync = promisify(brotliDecompress)
-
-async function decompressResponse(
-  responseBody: ArrayBuffer,
-  contentEncoding: string | null
-): Promise<Buffer> {
-  const buffer = Buffer.from(responseBody)
-
-  if (!contentEncoding) {
-    return buffer
-  }
-
-  try {
-    switch (contentEncoding.toLowerCase()) {
-      case 'gzip':
-        return await gunzipAsync(buffer)
-      case 'deflate':
-        return await inflateAsync(buffer)
-      case 'br':
-      case 'brotli':
-        return await brotliDecompressAsync(buffer)
-      default:
-        console.warn(`Unknown compression format: ${contentEncoding}`)
-        return buffer
-    }
-  } catch (error) {
-    console.error(`Failed to decompress ${contentEncoding}:`, error)
-    return buffer
-  }
-}
-
-const AUTH_HEADER = 'x-monitor-auth'
-
-async function validateAuthKey(
-  request: NextRequest,
-  workspaceId: string | null
-): Promise<void> {
-  if (process.env.DISABLE_AUTHENTICATION === 'true') {
-    return
-  }
-  const authHeader = request.headers.get(AUTH_HEADER)
-
-  if (!authHeader) {
-    throw new HttpError(401, 'Unauthorized - x-monitor-auth header missing')
-  }
-
-  const authKey = await prisma.authKey.findUnique({
-    where: {
-      key: authHeader.trim(),
-      deletedAt: null,
-    },
-  })
-
-  if (!authKey) {
-    throw new HttpError(401, 'Unauthorized: Invalid or missing API key')
-  }
-
-  // Check if auth key belongs to the workspace (if workspaceId is provided)
-  if (
-    workspaceId &&
-    authKey.workspaceId &&
-    authKey.workspaceId !== workspaceId
-  ) {
-    throw new HttpError(
-      401,
-      'Unauthorized: API key does not belong to this workspace'
-    )
-  }
-}
+import {
+  decompressResponse,
+  validateAuthKey,
+  extractHeaders,
+  applyUpstreamHeaders,
+  captureResponseBody,
+} from '@/lib/route-helpers'
+import { getParserForProvider, detectProviderFromRequest } from '@/lib/format'
+import { getPricingForUsage } from '@/lib/pricing'
+import type { ConversationModel } from '@/lib/format/model'
 
 async function handleProxy(
   request: NextRequest,
@@ -135,35 +70,8 @@ async function handleProxy(
       }
     }
 
-    const requestHeaders: Record<string, string> = {}
-    request.headers.forEach((value, key) => {
-      if (key.toLowerCase() !== 'x-auth') {
-        requestHeaders[key.toLowerCase()] = value
-      }
-    })
-
-    // Apply upstream headers based on format (array or object)
-    if (upstream.headers) {
-      if (Array.isArray(upstream.headers)) {
-        // New format: array of {name, value, priority}
-        // Apply low priority headers first, then high priority (which can override)
-        const sortedHeaders = [...upstream.headers].sort((a: any, b: any) => {
-          if (a.priority === 'low' && b.priority === 'high') return -1
-          if (a.priority === 'high' && b.priority === 'low') return 1
-          return 0
-        })
-        sortedHeaders.forEach((header: any) => {
-          if (header.name) {
-            requestHeaders[header.name.toLowerCase()] = header.value
-          }
-        })
-      } else if (typeof upstream.headers === 'object') {
-        // Old format: object
-        Object.entries(upstream.headers).forEach(([key, value]) => {
-          requestHeaders[String(key).toLowerCase()] = String(value)
-        })
-      }
-    }
+    const requestHeaders = extractHeaders(request)
+    applyUpstreamHeaders(requestHeaders, upstream.headers)
 
     if (!upstream.url) {
       const acceptHeader = request.headers.get('accept') || ''
@@ -219,6 +127,9 @@ async function handleProxy(
     )
     console.log(`Request headers:\n`, requestHeaders)
 
+    // Track start time for duration
+    const startTime = Date.now()
+
     // Check if format conversion is needed
     const needsConversion =
       upstream.outputFormat && upstream.inputFormat !== upstream.outputFormat
@@ -261,88 +172,109 @@ async function handleProxy(
       }
     }
 
-    // Always use tee approach to capture response while streaming to client
-    const capturedChunks: Uint8Array[] = []
-    let totalSize = 0
+    // Capture response and extract metadata
+    const clientStream = await captureResponseBody(
+      response,
+      async (decompressedResponseBody, responseHeaders) => {
+        const durationMs = Date.now() - startTime
 
-    // Create a transform stream to capture data while passing it through
-    const captureStream = new TransformStream({
-      transform(chunk, controller) {
-        capturedChunks.push(new Uint8Array(chunk))
-        totalSize += chunk.byteLength
-        controller.enqueue(chunk)
-      },
-    })
+        // Try to parse the request/response to extract model information
+        let conversationModel: ConversationModel | undefined
+        let provider = upstream.headers?.['x-provider'] || null
+        let requestModel: string | undefined
+        let responseModel: string | undefined
+        let requestTokens: number | undefined
+        let responseTokens: number | undefined
+        let pricingData: any = null
+        let priceUsd: number | undefined
 
-    // Tee the response body - one stream goes to capture, other to client
-    const [captureReader, clientStream] = response.body!.tee()
+        try {
+          // Try to detect provider from request if not set
+          if (!provider && decompressedRequestBody) {
+            const requestJson = JSON.parse(
+              decompressedRequestBody.toString('utf-8')
+            )
+            provider = detectProviderFromRequest(requestHeaders, requestJson)
+          }
 
-    // Pipe one stream through our capture transform
-    captureReader.pipeThrough(captureStream)
+          // Get parser for the provider
+          const parser = getParserForProvider(provider)
+          if (parser && decompressedRequestBody) {
+            try {
+              const requestJson = JSON.parse(
+                decompressedRequestBody.toString('utf-8')
+              )
+              const responseJson = JSON.parse(
+                decompressedResponseBody.toString('utf-8')
+              )
 
-    // Set up headers for response
-    const responseHeaders: Record<string, string> = {}
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value
-    })
+              conversationModel = parser.createConversation(
+                requestJson,
+                responseJson
+              )
+              if (conversationModel) {
+                requestModel = conversationModel.models.request
+                responseModel = conversationModel.models.response
+                requestTokens = conversationModel.usage?.inputTokens
+                responseTokens = conversationModel.usage?.outputTokens
 
-    // Start the capture process in the background
-    const capturePromise = (async () => {
-      try {
-        const reader = captureStream.readable.getReader()
-        while (true) {
-          const { done } = await reader.read()
-          if (done) break
+                // Calculate pricing if we have usage data
+                if (requestTokens && responseTokens && responseModel) {
+                  const pricingInfo = await getPricingForUsage(
+                    responseModel,
+                    requestTokens,
+                    responseTokens
+                  )
+                  if (pricingInfo) {
+                    pricingData = {
+                      inputPricePerMillion:
+                        pricingInfo.pricing.inputPricePerMillion,
+                      outputPricePerMillion:
+                        pricingInfo.pricing.outputPricePerMillion,
+                      provider: pricingInfo.pricing.provider,
+                    }
+                    priceUsd = pricingInfo.totalPriceUsd
+                  }
+                }
+              }
+            } catch (parseError) {
+              console.warn('Failed to parse conversation model:', parseError)
+            }
+          }
+        } catch (error) {
+          console.warn('Failed to extract model information:', error)
         }
 
-        // Combine all captured chunks
-        const capturedBody = new Uint8Array(totalSize)
-        let offset = 0
-        for (const chunk of capturedChunks) {
-          capturedBody.set(chunk, offset)
-          offset += chunk.length
-        }
-
-        console.log(`Body size: ${totalSize} bytes`)
-
-        // Limit response body logging to prevent huge logs
-        const responseText = Buffer.from(capturedBody).toString('utf-8')
-        if (responseText.length > 2000) {
-          console.log(
-            `Response Body (truncated):\n`,
-            responseText.substring(0, 2000) + '...'
-          )
-        } else {
-          console.log(`Response Body:\n`, responseText)
-        }
-
-        // Get content encoding and decompress if needed
-        const contentEncoding = response.headers.get('content-encoding')
-        const decompressedBody = await decompressResponse(
-          capturedBody.buffer,
-          contentEncoding
-        )
-
-        // Store in database
+        // Store in database with new fields
         await prisma.response.create({
           data: {
             url: targetUrl,
             method,
             status: response.status,
             requestBody: decompressedRequestBody,
-            responseBody: decompressedBody,
+            responseBody: decompressedResponseBody,
             requestHeaders,
             responseHeaders,
             workspaceId: foundWorkspace.id,
+            upstreamId: upstream.id,
+            provider,
+            requestModel,
+            responseModel,
+            requestTokens,
+            responseTokens,
+            pricing: pricingData,
+            priceUsd,
+            durationMs,
           },
         })
-      } catch (error) {
-        console.error('Error capturing response:', error)
       }
-    })()
+    )
 
-    // Don't await the capture - let it happen in background
-    capturePromise.catch(console.error)
+    // Set up response headers
+    const responseHeaders: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value
+    })
 
     return new NextResponse(clientStream, {
       status: response.status,

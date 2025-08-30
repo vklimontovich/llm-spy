@@ -9,53 +9,43 @@ export type { ConversationModel, ProviderParser } from './model'
 import { AnthropicParser } from './anthropic'
 import type { ProviderParser } from './model'
 
-/**
- * Returns the appropriate parser for a given payload
- * @param payloadUnknown - The request payload to analyze
- * @returns A ProviderParser instance or undefined if no matching parser found
- */
-export function getProvider(
-  payloadUnknown: unknown
-): ProviderParser | undefined {
-  if (!payloadUnknown || typeof payloadUnknown !== 'object') {
-    return undefined
-  }
-
-  const payload = payloadUnknown as Record<string, unknown>
-
-  // Check for Anthropic format
-  if ('model' in payload && 'messages' in payload) {
-    const model = payload.model
-    if (typeof model === 'string' && model.includes('claude')) {
-      return new AnthropicParser()
-    }
-
-    // Additional check for Anthropic structure
-    if (Array.isArray(payload.messages)) {
-      const hasAnthropicStructure = payload.messages.some(
-        (msg: any) =>
-          msg?.content &&
-          Array.isArray(msg.content) &&
-          msg.content.some(
-            (part: any) =>
-              part?.type === 'tool_use' || part?.type === 'tool_result'
-          )
-      )
-      if (hasAnthropicStructure) {
-        return new AnthropicParser()
-      }
-    }
-  }
-
-  // Add more provider checks here as needed
-  // e.g., OpenAI, Google, etc.
-
-  return undefined
+const parsers: Record<string, ProviderParser> = {
+  anthropic: new AnthropicParser(),
+  // Add more parsers as needed: openai, google, mistral, cohere, meta
 }
 
-export function getProviderByName(name: string): ProviderParser | undefined {
-  if (name === 'anthropic') {
-    return new AnthropicParser()
+export function getParserForProvider(
+  provider: string | null
+): ProviderParser | null {
+  if (!provider) return null
+  return parsers[provider.toLowerCase()] || null
+}
+
+export function detectProviderFromRequest(
+  headers: Record<string, string>,
+  body?: any
+): string | null {
+  // Check Anthropic-specific headers
+  if (headers['anthropic-version'] || headers['x-anthropic-version']) {
+    return 'anthropic'
   }
-  return undefined
+
+  // Check OpenAI-specific headers
+  if (headers['openai-organization'] || headers['openai-beta']) {
+    return 'openai'
+  }
+
+  // Check body structure
+  if (body?.model && typeof body.model === 'string') {
+    const model = body.model.toLowerCase()
+    if (model.includes('claude')) return 'anthropic'
+    if (model.includes('gpt')) return 'openai'
+    if (model.includes('gemini')) return 'google'
+    if (model.includes('mistral') || model.includes('codestral'))
+      return 'mistral'
+    if (model.includes('command')) return 'cohere'
+    if (model.includes('llama')) return 'meta'
+  }
+
+  return null
 }

@@ -1,7 +1,15 @@
 'use client'
 
+import { useState } from 'react'
 import { Typography } from 'antd'
-import { User, Bot, Settings, Wrench, MessageSquare } from 'lucide-react'
+import {
+  User,
+  Bot,
+  Settings,
+  Wrench,
+  MessageSquare,
+  ChevronDown,
+} from 'lucide-react'
 import SmartContentView from './SmartContentView'
 import type { ModelMessage } from 'ai'
 
@@ -244,7 +252,14 @@ function MessageContent({ message }: { message: ModelMessage }) {
 }
 
 // Message Group View Component
-function MessageGroupView({ group }: { group: GroupedMessage }) {
+function MessageGroupView({
+  group,
+  defaultCollapsed = false,
+}: {
+  group: GroupedMessage
+  defaultCollapsed?: boolean
+}) {
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed)
   const roleConfig = getRoleConfig(group.role)
   const IconComponent = roleConfig.icon
 
@@ -255,10 +270,58 @@ function MessageGroupView({ group }: { group: GroupedMessage }) {
 
     return (
       <div
-        className="w-full rounded-lg px-4 py-3"
+        className="w-full rounded-lg px-4 py-3 relative"
         style={{ backgroundColor: roleConfig.bgColor }}
       >
-        <div className="flex items-center gap-2 mb-2">
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <IconComponent
+              className="w-4 h-4"
+              style={{ color: roleConfig.color }}
+            />
+            <span
+              className="text-sm font-semibold"
+              style={{ color: roleConfig.color }}
+            >
+              {roleConfig.label}
+            </span>
+            {annotation && (
+              <>
+                <span className="text-sm text-gray-400">•</span>
+                <span className="text-sm text-gray-600">{annotation}</span>
+              </>
+            )}
+          </div>
+          <button
+            onClick={() => setIsCollapsed(!isCollapsed)}
+            className="p-1 hover:bg-gray-200 hover:bg-opacity-50 rounded transition-all duration-200"
+            style={{ color: roleConfig.color }}
+          >
+            <ChevronDown
+              className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+            />
+          </button>
+        </div>
+        <div
+          className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'max-h-0' : 'max-h-[5000px] mt-2'}`}
+        >
+          <div className="text-gray-800">
+            <MessageContent message={message} />
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Multiple messages
+  return (
+    <div
+      className="w-full rounded-lg px-4 py-3 relative"
+      style={{ backgroundColor: roleConfig.bgColor }}
+    >
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-2">
           <IconComponent
             className="w-4 h-4"
             style={{ color: roleConfig.color }}
@@ -269,56 +332,38 @@ function MessageGroupView({ group }: { group: GroupedMessage }) {
           >
             {roleConfig.label}
           </span>
-          {annotation && (
-            <>
-              <span className="text-sm text-gray-400">•</span>
-              <span className="text-sm text-gray-600">{annotation}</span>
-            </>
-          )}
+          <span
+            className="text-xs px-2 py-0.5 rounded-full text-white"
+            style={{ backgroundColor: roleConfig.color }}
+          >
+            {group.messages.length} content items
+          </span>
         </div>
-        <div className="text-gray-800">
-          <MessageContent message={message} />
-        </div>
-      </div>
-    )
-  }
-
-  // Multiple messages
-  return (
-    <div
-      className="w-full rounded-lg px-4 py-3"
-      style={{ backgroundColor: roleConfig.bgColor }}
-    >
-      {/* Header */}
-      <div className="flex items-center gap-2 mb-3">
-        <IconComponent
-          className="w-4 h-4"
-          style={{ color: roleConfig.color }}
-        />
-        <span
-          className="text-sm font-semibold"
+        <button
+          onClick={() => setIsCollapsed(!isCollapsed)}
+          className="p-1 hover:bg-gray-200 hover:bg-opacity-50 rounded transition-all duration-200"
           style={{ color: roleConfig.color }}
         >
-          {roleConfig.label}
-        </span>
-        <span
-          className="text-xs px-2 py-0.5 rounded-full text-white"
-          style={{ backgroundColor: roleConfig.color }}
-        >
-          {group.messages.length} content items
-        </span>
+          <ChevronDown
+            className={`w-4 h-4 transition-transform duration-200 ${isCollapsed ? '-rotate-90' : ''}`}
+          />
+        </button>
       </div>
 
       {/* Messages with visible dividers */}
-      <div>
-        {group.messages.map((message, idx) => (
-          <div key={idx}>
-            {idx > 0 && <div className="h-[2px] my-3 bg-gray-200" />}
-            <div className="text-gray-800">
-              <MessageContent message={message} />
+      <div
+        className={`overflow-hidden transition-all duration-300 ${isCollapsed ? 'max-h-0' : 'max-h-[5000px] mt-3'}`}
+      >
+        <div>
+          {group.messages.map((message, idx) => (
+            <div key={idx}>
+              {idx > 0 && <div className="h-[2px] my-3 bg-gray-200" />}
+              <div className="text-gray-800">
+                <MessageContent message={message} />
+              </div>
             </div>
-          </div>
-        ))}
+          ))}
+        </div>
       </div>
     </div>
   )
@@ -339,7 +384,11 @@ export default function ChatView({ messages }: ChatViewProps) {
   return (
     <div className="space-y-3">
       {groupedMessages.map((group, index) => (
-        <MessageGroupView key={index} group={group} />
+        <MessageGroupView
+          key={index}
+          group={group}
+          defaultCollapsed={group.role === 'system'}
+        />
       ))}
     </div>
   )

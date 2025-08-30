@@ -8,6 +8,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cursor = searchParams.get('cursor')
     const limit = parseInt(searchParams.get('limit') || '20', 10)
+    const previewLength = 50 // Configurable preview length
 
     if (limit > 100) {
       return NextResponse.json(
@@ -16,48 +17,186 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const responses = await prisma.response.findMany({
-      where: {
-        workspaceId: workspace.id,
-      },
-      take: limit + 1,
-      ...(cursor && {
-        cursor: { id: cursor },
-        skip: 1,
-      }),
-      orderBy: {
-        createdAt: 'desc',
-      },
-      select: {
-        id: true,
-        url: true,
-        method: true,
-        status: true,
-        requestBody: true,
-        responseBody: true,
-        requestHeaders: true,
-        responseHeaders: true,
-        createdAt: true,
-      },
-    })
+    // Use raw query to generate preview on database side
+    const query = cursor
+      ? prisma.$queryRaw<any[]>`
+          SELECT 
+            id,
+            url,
+            method,
+            status,
+            "requestHeaders",
+            "responseHeaders",
+            "createdAt",
+            provider,
+            request_model as "requestModel",
+            response_model as "responseModel",
+            request_tokens as "requestTokens",
+            response_tokens as "responseTokens",
+            price_usd as "priceUsd",
+            duration_ms as "durationMs",
+            CASE 
+              WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
+                CONCAT(
+                  LEFT(REGEXP_REPLACE(
+                    COALESCE(
+                      CASE 
+                        WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                          CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
+                        ELSE 
+                          CONVERT_FROM("requestBody", 'UTF8')
+                      END,
+                      ENCODE("requestBody", 'escape')
+                    ), 
+                    E'[\\n\\r\\t]+', ' ', 'g'
+                  ), ${previewLength}::int),
+                  E'\\n',
+                  '→ ',
+                  LEFT(REGEXP_REPLACE(
+                    COALESCE(
+                      CASE 
+                        WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                          CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
+                        ELSE 
+                          CONVERT_FROM("responseBody", 'UTF8')
+                    END,
+                      ENCODE("responseBody", 'escape')
+                    ), 
+                    E'[\\n\\r\\t]+', ' ', 'g'
+                  ), ${previewLength}::int)
+                )
+              WHEN "requestBody" IS NOT NULL THEN
+                LEFT(REGEXP_REPLACE(
+                  COALESCE(
+                    CASE 
+                      WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                        CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
+                      ELSE 
+                        CONVERT_FROM("requestBody", 'UTF8')
+                    END,
+                    ENCODE("requestBody", 'escape')
+                  ), 
+                  E'[\\n\\r\\t]+', ' ', 'g'
+                ), ${previewLength * 2}::int)
+              WHEN "responseBody" IS NOT NULL THEN
+                CONCAT('→ ', LEFT(REGEXP_REPLACE(
+                  COALESCE(
+                    CASE 
+                      WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                        CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
+                      ELSE 
+                        CONVERT_FROM("responseBody", 'UTF8')
+                    END,
+                    ENCODE("responseBody", 'escape')
+                  ), 
+                  E'[\\n\\r\\t]+', ' ', 'g'
+                ), ${previewLength * 2}::int))
+              ELSE '-'
+            END as preview,
+            COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
+            COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"
+          FROM responses
+          WHERE workspace_id = ${workspace.id}
+            AND "createdAt" < (SELECT "createdAt" FROM responses WHERE id = ${cursor})
+          ORDER BY "createdAt" DESC
+          LIMIT ${limit + 1}
+        `
+      : prisma.$queryRaw<any[]>`
+          SELECT 
+            id,
+            url,
+            method,
+            status,
+            "requestHeaders",
+            "responseHeaders",
+            "createdAt",
+            provider,
+            request_model as "requestModel",
+            response_model as "responseModel",
+            request_tokens as "requestTokens",
+            response_tokens as "responseTokens",
+            price_usd as "priceUsd",
+            duration_ms as "durationMs",
+            CASE 
+              WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
+                CONCAT(
+                  LEFT(REGEXP_REPLACE(
+                    COALESCE(
+                      CASE 
+                        WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                          CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
+                        ELSE 
+                          CONVERT_FROM("requestBody", 'UTF8')
+                      END,
+                      ENCODE("requestBody", 'escape')
+                    ), 
+                    E'[\\n\\r\\t]+', ' ', 'g'
+                  ), ${previewLength}::int),
+                  E'\\n',
+                  '→ ',
+                  LEFT(REGEXP_REPLACE(
+                    COALESCE(
+                      CASE 
+                        WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                          CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
+                        ELSE 
+                          CONVERT_FROM("responseBody", 'UTF8')
+                    END,
+                      ENCODE("responseBody", 'escape')
+                    ), 
+                    E'[\\n\\r\\t]+', ' ', 'g'
+                  ), ${previewLength}::int)
+                )
+              WHEN "requestBody" IS NOT NULL THEN
+                LEFT(REGEXP_REPLACE(
+                  COALESCE(
+                    CASE 
+                      WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                        CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
+                      ELSE 
+                        CONVERT_FROM("requestBody", 'UTF8')
+                    END,
+                    ENCODE("requestBody", 'escape')
+                  ), 
+                  E'[\\n\\r\\t]+', ' ', 'g'
+                ), ${previewLength * 2}::int)
+              WHEN "responseBody" IS NOT NULL THEN
+                CONCAT('→ ', LEFT(REGEXP_REPLACE(
+                  COALESCE(
+                    CASE 
+                      WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
+                        CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
+                      ELSE 
+                        CONVERT_FROM("responseBody", 'UTF8')
+                    END,
+                    ENCODE("responseBody", 'escape')
+                  ), 
+                  E'[\\n\\r\\t]+', ' ', 'g'
+                ), ${previewLength * 2}::int))
+              ELSE '-'
+            END as preview,
+            COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
+            COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"
+          FROM responses
+          WHERE workspace_id = ${workspace.id}
+          ORDER BY "createdAt" DESC
+          LIMIT ${limit + 1}
+        `
+
+    const responses = await query
 
     const hasNextPage = responses.length > limit
     const items = hasNextPage ? responses.slice(0, -1) : responses
     const nextCursor = hasNextPage ? responses[responses.length - 2].id : null
 
-    // Process items to add computed fields
-    const processedItems = items.map(item => {
-      const { requestBody, responseBody, ...itemWithoutBodies } = item
-      return {
-        ...itemWithoutBodies,
-        requestBodySize: requestBody ? requestBody.length : 0,
-        responseBodySize: responseBody ? responseBody.length : 0,
-        responseContentType:
-          item.responseHeaders && typeof item.responseHeaders === 'object'
-            ? (item.responseHeaders as any)['content-type'] || '-'
-            : '-',
-      }
-    })
+    // Process items to add content-type
+    const processedItems = items.map(item => ({
+      ...item,
+      responseContentType:
+        item.responseHeaders && typeof item.responseHeaders === 'object'
+          ? (item.responseHeaders as any)['content-type'] || '-'
+          : '-',
+    }))
 
     return NextResponse.json({
       items: processedItems,

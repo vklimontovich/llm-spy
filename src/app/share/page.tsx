@@ -32,7 +32,7 @@ function SharePageContent() {
       <div className="p-6">
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <h1 className="text-2xl font-bold">Shared Request</h1>
+            <h1 className="text-2xl font-bold">LLM Call Details</h1>
           </div>
           {session && (
             <Button

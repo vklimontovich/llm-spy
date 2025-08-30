@@ -21,7 +21,7 @@ export default function RequestDetails({
 
   const title = (
     <div className="flex items-center justify-between">
-      <span>Request/Response Details</span>
+      <span>LLM Call Details</span>
       {showShare && selectedRequest && (
         <ShareButton requestId={selectedRequest.id} />
       )}

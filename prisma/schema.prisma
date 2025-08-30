@@ -78,6 +78,7 @@ model Upstream {
   createdAt     DateTime       @default(now())
   updatedAt     DateTime       @default(now()) @updatedAt
   otelUpstreams OtelUpstream[]
+  responses     Response[]
 
   @@map("upstreams")
 }
@@ -108,6 +109,16 @@ model Response {
   public          Boolean    @default(false)
   workspaceId     String?    @map("workspace_id")
   workspace       Workspace? @relation(fields: [workspaceId], references: [id])
+  upstreamId      String?    @map("upstream_id")
+  upstream        Upstream?  @relation(fields: [upstreamId], references: [id])
+  provider        String?
+  requestModel    String?    @map("request_model")
+  responseModel   String?    @map("response_model")
+  requestTokens   Int?       @map("request_tokens")
+  responseTokens  Int?       @map("response_tokens")
+  priceUsd        Float?     @map("price_usd")
+  durationMs      Int?       @map("duration_ms")
+  pricing         Json?
   createdAt       DateTime   @default(now())
 
   @@index([sessionId])

@@ -3,8 +3,8 @@ import { prisma } from '@/lib/prisma'
 import { checkWorkspaceAuth } from '@/lib/auth'
 import { withError } from '@/lib/route-helpers'
 import { requireDefined } from '@/lib/preconditions'
-import { getProvider } from '@/lib/format'
 import { parseSSEEvents } from '@/lib/sse-utils'
+import { getParserForProvider } from '@/lib/format'
 
 export const GET = withError(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url)
@@ -47,10 +47,15 @@ export const GET = withError(async (request: NextRequest) => {
     }
   }
 
+  const providerName = response.provider || 'anthropic'
+
   // Process response - keep raw for client-side reconstruction
   let rawResponseBody: any = null
 
-  const provider = rawRequestBody ? getProvider(rawRequestBody) : undefined
+  const provider = requireDefined(
+    getParserForProvider(providerName),
+    `No parser found for provider ${providerName}`
+  )
 
   let rawResponseJson
   if (responseBody) {

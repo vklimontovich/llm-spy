@@ -212,6 +212,10 @@ export function otelSpansToModel(spans: ParsedSpan[]): ConversationModel {
   return {
     modelMessages,
     tools,
+    models: {
+      request: model,
+      response: model,
+    },
     meta: {
       model,
       metadata,

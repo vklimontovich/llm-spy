@@ -26,6 +26,14 @@ export interface RequestResponse {
   responseHeaders: any
   createdAt: string
   public?: boolean
+  preview: string
+  provider?: string | null
+  requestModel?: string | null
+  responseModel?: string | null
+  requestTokens?: number | null
+  responseTokens?: number | null
+  priceUsd?: number | null
+  durationMs?: number | null
 }
 
 export default function RequestsPage() {
@@ -128,6 +136,24 @@ export default function RequestsPage() {
     return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + sizes[i]
   }
 
+  const formatNumber = (num: number | null | undefined) => {
+    if (num == null) return '-'
+    return num.toLocaleString('en-US')
+  }
+
+  const formatPrice = (price: number | null | undefined) => {
+    if (price == null) return '-'
+    if (price < 0.01) return `$${price.toFixed(6)}`
+    if (price < 1) return `$${price.toFixed(4)}`
+    return `$${price.toFixed(2)}`
+  }
+
+  const formatDuration = (ms: number | null | undefined) => {
+    if (ms == null) return '-'
+    if (ms < 1000) return `${ms}ms`
+    return `${(ms / 1000).toFixed(2)}s`
+  }
+
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -168,73 +194,75 @@ export default function RequestsPage() {
       title: 'Time',
       dataIndex: 'createdAt',
       key: 'createdAt',
-      width: 240,
+      width: 180,
+      fixed: 'left',
       render: date => {
         const formatted = formatDate(date)
         return (
           <span className="text-xs font-mono whitespace-nowrap">
-            {formatted.full}{' '}
-            <span className="text-gray-500">({formatted.ago})</span>
+            <div>{formatted.full}</div>
+            <div className="text-gray-500">({formatted.ago})</div>
           </span>
         )
       },
     },
     {
-      title: 'Method',
-      dataIndex: 'method',
-      key: 'method',
-      width: 70,
-      render: method => (
-        <span
-          className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-            method === 'GET'
-              ? 'bg-green-100 text-green-800'
-              : method === 'POST'
-                ? 'bg-blue-100 text-blue-800'
-                : method === 'PUT'
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : method === 'DELETE'
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          {method}
-        </span>
-      ),
+      title: <span className="whitespace-nowrap">Model</span>,
+      dataIndex: 'responseModel',
+      key: 'responseModel',
+      width: 120,
+      render: model => {
+        if (!model) return <span className="text-xs text-gray-400">-</span>
+
+        // Shorten model names for display
+        const shortModel = model
+          .replace('claude-3-5-sonnet-20241022', 'claude-3.5-sonnet')
+          .replace('claude-3-opus-20240229', 'claude-3-opus')
+          .replace('claude-3-haiku-20240307', 'claude-3-haiku')
+          .replace('gpt-4o-mini', 'gpt-4o-mini')
+          .replace('gpt-4-turbo', 'gpt-4-turbo')
+          .replace('gpt-3.5-turbo', 'gpt-3.5')
+
+        return (
+          <span
+            className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
+            title={model}
+          >
+            {shortModel}
+          </span>
+        )
+      },
     },
     {
-      title: 'Status',
+      title: <span className="whitespace-nowrap">Status</span>,
       dataIndex: 'status',
       key: 'status',
-      width: 60,
-      render: status => (
-        <span
-          className={`px-1 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-            status >= 200 && status < 300
-              ? 'bg-green-100 text-green-800'
-              : status >= 300 && status < 400
-                ? 'bg-blue-100 text-blue-800'
-                : status >= 400 && status < 500
-                  ? 'bg-yellow-100 text-yellow-800'
-                  : status >= 500
-                    ? 'bg-red-100 text-red-800'
-                    : 'bg-gray-100 text-gray-800'
-          }`}
-        >
-          {status}
-        </span>
-      ),
+      width: 70,
+      render: status => {
+        const isSuccess = status >= 200 && status < 300
+        return (
+          <span
+            className={`px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
+              isSuccess
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
+            }`}
+          >
+            {isSuccess ? 'OK' : 'ERR'}
+          </span>
+        )
+      },
     },
     {
-      title: 'Session',
+      title: <span className="whitespace-nowrap">Session</span>,
       key: 'sessionId',
-      width: 100,
+      width: 70,
       render: (_, record) => {
         const sessionId = extractSessionId(record.requestHeaders)
         if (!sessionId) return <span className="text-xs text-gray-400">-</span>
 
-        // Show first 8 chars of session ID
-        const shortId = sessionId.substring(0, 8)
+        // Show first 6 chars of session ID
+        const shortId = sessionId.substring(0, 6)
         return (
           <span className="text-xs font-mono text-blue-600" title={sessionId}>
             {shortId}
@@ -243,42 +271,87 @@ export default function RequestsPage() {
       },
     },
     {
-      title: 'URL',
-      dataIndex: 'url',
-      key: 'url',
-      render: url => (
-        <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block max-w-xs">
-          {url}
-        </span>
+      title: <span className="whitespace-nowrap">Preview</span>,
+      dataIndex: 'preview',
+      key: 'preview',
+      width: 250,
+      ellipsis: true,
+      render: preview => {
+        const lines = preview?.split('\n') || ['-']
+        return (
+          <div className="text-xs text-gray-600">
+            {lines[0] && <div className="truncate">{lines[0]}</div>}
+            {lines[1] && (
+              <div className="truncate text-gray-500">{lines[1]}</div>
+            )}
+          </div>
+        )
+      },
+    },
+    {
+      title: <span className="whitespace-nowrap">Input</span>,
+      dataIndex: 'requestTokens',
+      key: 'requestTokens',
+      width: 70,
+      align: 'right',
+      fixed: 'right',
+      render: tokens => (
+        <span className="text-xs font-mono">{formatNumber(tokens)}</span>
       ),
     },
     {
-      title: 'Response Type',
-      dataIndex: 'responseContentType',
-      key: 'responseContentType',
-      width: 200,
-      render: contentType => (
-        <span className="text-xs font-mono whitespace-nowrap overflow-hidden text-ellipsis block">
-          {contentType || '-'}
-        </span>
+      title: <span className="whitespace-nowrap">Output</span>,
+      dataIndex: 'responseTokens',
+      key: 'responseTokens',
+      width: 70,
+      align: 'right',
+      fixed: 'right',
+      render: tokens => (
+        <span className="text-xs font-mono">{formatNumber(tokens)}</span>
       ),
     },
     {
-      title: 'Req Size',
+      title: <span className="whitespace-nowrap">Price</span>,
+      dataIndex: 'priceUsd',
+      key: 'priceUsd',
+      width: 80,
+      align: 'right',
+      fixed: 'right',
+      render: price => (
+        <span className="text-xs font-mono">{formatPrice(price)}</span>
+      ),
+    },
+    {
+      title: <span className="whitespace-nowrap">Duration</span>,
+      dataIndex: 'durationMs',
+      key: 'durationMs',
+      width: 70,
+      align: 'right',
+      fixed: 'right',
+      render: duration => (
+        <span className="text-xs font-mono">{formatDuration(duration)}</span>
+      ),
+    },
+    {
+      title: <span className="whitespace-nowrap">Req</span>,
       dataIndex: 'requestBodySize',
       key: 'requestBodySize',
-      width: 80,
+      width: 60,
+      align: 'right',
+      fixed: 'right',
       render: bytes => (
-        <span className="text-xs whitespace-nowrap">{formatBytes(bytes)}</span>
+        <span className="text-xs font-mono">{formatBytes(bytes)}</span>
       ),
     },
     {
-      title: 'Resp Size',
+      title: <span className="whitespace-nowrap">Res</span>,
       dataIndex: 'responseBodySize',
       key: 'responseBodySize',
-      width: 80,
+      width: 60,
+      align: 'right',
+      fixed: 'right',
       render: bytes => (
-        <span className="text-xs whitespace-nowrap">{formatBytes(bytes)}</span>
+        <span className="text-xs font-mono">{formatBytes(bytes)}</span>
       ),
     },
   ]
@@ -298,10 +371,8 @@ export default function RequestsPage() {
       <div className="p-6">
         <div className="flex items-center justify-between mb-2">
           <div>
-            <h1 className="text-2xl font-bold">Requests</h1>
-            <p className="text-gray-600">
-              View all proxied HTTP requests and responses
-            </p>
+            <h1 className="text-2xl font-bold">LLM Calls</h1>
+            <p className="text-gray-600">View all captured LLM CallsNow</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
