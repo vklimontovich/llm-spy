@@ -1,16 +1,7 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import {
-  Card,
-  Input,
-  Select,
-  Button,
-  Alert,
-  Typography,
-  Collapse,
-  Badge,
-} from 'antd'
+import { useState, useEffect, startTransition } from 'react'
+import { Card, Input, Select, Button, Alert, Collapse, Badge } from 'antd'
 import { FileJson, MessageSquare, Wrench } from 'lucide-react'
 import ChatView from '@/components/ChatView'
 import ToolDeclarationView from '@/components/ToolDeclarationView'
@@ -19,7 +10,6 @@ import type { ModelMessage, Tool } from 'ai'
 import { useRouter } from 'next/navigation'
 
 const { TextArea } = Input
-const { Title, Text } = Typography
 
 const providers = [
   { value: 'anthropic', label: 'Anthropic' },
@@ -43,6 +33,7 @@ export default function ChatViewToolPage({
   const [messages, setMessages] = useState<ModelMessage[] | null>(null)
   const [tools, setTools] = useState<Tool[] | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [isParsing, setIsParsing] = useState(false)
 
   // Update provider when defaultProvider changes
   useEffect(() => {
@@ -51,20 +42,26 @@ export default function ChatViewToolPage({
     }
   }, [defaultProvider])
 
-  const handleParse = () => {
+  const handleParse = async () => {
     setError(null)
     setMessages(null)
     setTools(null)
+    setIsParsing(true)
 
     if (!jsonInput.trim()) {
       setError('Please enter JSON data')
+      setIsParsing(false)
       return
     }
 
+    // Use setTimeout to allow UI to update before heavy processing
+    await new Promise(resolve => setTimeout(resolve, 10))
+
     try {
       const parsed = JSON.parse(jsonInput)
-      console.log('Parsed JSON:', parsed)
-      console.log('Provider:', provider)
+
+      // Another brief pause for UI update
+      await new Promise(resolve => setTimeout(resolve, 10))
 
       const parser = getParserForProvider(provider)
       console.log('Parser:', parser)
@@ -85,39 +82,46 @@ export default function ChatViewToolPage({
         if (parsed.tools && Array.isArray(parsed.tools)) {
           setTools(parsed.tools as Tool[])
         }
+        setIsParsing(false)
         return
       }
 
       // Use the parser's createConversation method to convert provider format to model messages
       try {
-        const conversation = parser.createConversation(parsed)
-        console.log('Conversation:', conversation)
+        // Use startTransition for non-urgent updates
+        startTransition(() => {
+          const conversation = parser.createConversation(parsed)
+          console.log('Conversation:', conversation)
 
-        if (conversation) {
-          if (conversation.modelMessages) {
-            setMessages(conversation.modelMessages)
+          if (conversation) {
+            if (conversation.modelMessages) {
+              setMessages(conversation.modelMessages)
+            }
+            if (conversation.tools && conversation.tools.length > 0) {
+              setTools(conversation.tools)
+            }
+          } else {
+            console.error(
+              'Failed to parse JSON into conversation format',
+              conversation
+            )
+            setError('Failed to parse JSON into conversation format')
           }
-          if (conversation.tools && conversation.tools.length > 0) {
-            setTools(conversation.tools)
-          }
-        } else {
-          console.error(
-            'Failed to parse JSON into conversation format',
-            conversation
-          )
-          setError('Failed to parse JSON into conversation format')
-        }
+          setIsParsing(false)
+        })
       } catch (parseError) {
         console.error('Error in createConversation:', parseError)
         setError(
           `Parser error: ${parseError instanceof Error ? parseError.message : 'Unknown error'}`
         )
+        setIsParsing(false)
       }
     } catch (e) {
       console.error('JSON parsing error:', e)
       setError(
         `Invalid JSON: ${e instanceof Error ? e.message : 'Unknown error'}`
       )
+      setIsParsing(false)
     }
   }
 
@@ -126,6 +130,7 @@ export default function ChatViewToolPage({
     const examples: Record<string, any> = {
       anthropic: {
         model: 'claude-3-opus-20240229',
+        system: 'You are geography expert.',
         messages: [
           {
             role: 'user',
@@ -178,12 +183,10 @@ export default function ChatViewToolPage({
         {/* Compact Header */}
         <div className="mb-2 flex items-center gap-3">
           <MessageSquare className="w-5 h-5" />
-          <Title level={4} className="mb-0">
-            Chat View Tool
-          </Title>
-          <Text type="secondary" className="text-sm">
+          <h1 className="text-lg font-semibold mb-0">Chat View Tool</h1>
+          <span className="text-sm text-gray-500">
             Parse and visualize LLM conversations
-          </Text>
+          </span>
         </div>
 
         {/* Main Content - Vertical Layout */}
@@ -196,25 +199,29 @@ export default function ChatViewToolPage({
               <div className="flex items-center justify-between">
                 <span className="text-sm">Input</span>
                 <div className="flex items-center gap-2">
-                  <Text className="mr-1 text-xs">Provider:</Text>
+                  <span className="mr-1 text-xs">Provider:</span>
                   <Select
                     value={provider}
                     onChange={handleProviderChange}
                     options={providers}
-                    className="w-28"
                     size="small"
+                    className="w-28"
                   />
                   <Button
                     type="link"
                     onClick={handleExampleLoad}
                     icon={<FileJson className="w-3 h-3" />}
-                    size="small"
                     className="text-xs"
                   >
                     Example
                   </Button>
-                  <Button type="primary" onClick={handleParse} size="small">
-                    Parse
+                  <Button
+                    type="primary"
+                    onClick={handleParse}
+                    loading={isParsing}
+                    disabled={isParsing}
+                  >
+                    Process
                   </Button>
                 </div>
               </div>
@@ -244,7 +251,20 @@ export default function ChatViewToolPage({
 
           {/* Bottom - Output */}
           <Card
-            title={<span className="text-sm">Chat View</span>}
+            title={
+              <div className="flex items-center justify-between">
+                <span className="text-sm">Chat View</span>
+                {messages && messages.length > 0 && (
+                  <div className="text-xs text-gray-500 font-normal">
+                    {messages.length} message{messages.length !== 1 ? 's' : ''},{' '}
+                    {Math.round(
+                      new TextEncoder().encode(jsonInput).length / 1024
+                    )}{' '}
+                    kb
+                  </div>
+                )}
+              </div>
+            }
             size="small"
             className="flex-1 flex flex-col overflow-hidden"
             styles={{
@@ -255,7 +275,15 @@ export default function ChatViewToolPage({
               },
             }}
           >
-            {messages || tools ? (
+            {isParsing ? (
+              <div className="flex flex-col items-center justify-center h-full">
+                <div className="relative w-12 h-12">
+                  <div className="absolute top-0 left-0 w-full h-full border-4 border-gray-200 rounded-full"></div>
+                  <div className="absolute top-0 left-0 w-full h-full border-4 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                </div>
+                <span className="mt-4 text-sm text-gray-600">Processing</span>
+              </div>
+            ) : messages || tools ? (
               <div className="space-y-4">
                 {/* Tools section first, collapsed by default */}
                 {tools && tools.length > 0 && (
@@ -307,9 +335,9 @@ export default function ChatViewToolPage({
               <div className="flex items-center justify-center h-full text-gray-400">
                 <div className="text-center">
                   <MessageSquare className="w-10 h-10 mx-auto mb-2" />
-                  <Text type="secondary" className="text-sm">
+                  <span className="text-sm text-gray-500">
                     Enter JSON data and click &quot;Parse&quot; to visualize
-                  </Text>
+                  </span>
                 </div>
               </div>
             )}
