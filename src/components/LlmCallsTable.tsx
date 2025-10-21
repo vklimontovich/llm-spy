@@ -3,7 +3,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Table, Button, Switch, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
@@ -417,7 +417,7 @@ export default function LlmCallsTable() {
     },
   ]
 
-  const rowHref = (id: string) => `/${workspace.slug}/requests?id=${id}`
+  // row navigation handled inline via links in cells
 
   return (
     <div className="min-h-screen">

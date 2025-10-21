@@ -1,4 +1,4 @@
-import { createHash, createHmac } from 'crypto'
+import { createHash } from 'crypto'
 
 // Base62 encode from bytes without BigInt (ES2019-compatible)
 function base62Encode(bytes: Uint8Array, alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'): string {

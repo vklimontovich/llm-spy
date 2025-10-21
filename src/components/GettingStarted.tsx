@@ -31,14 +31,14 @@ export default function GettingStarted({
     return `${origin}/${upstreamPart}`
   }, [origin, upstreamPart, workspaceSlug])
 
-  const runClaudeCmd = useMemo(() => {
+  /* const runClaudeCmd = useMemo(() => {
     const monitorHeader = apiKey ? `x-monitor-auth: ${apiKey}` : 'x-monitor-auth: key you created'
     const anthropicKey = apiKey || 'your key'
     return `ANTHROPIC_BASE_URL="${exampleBaseUrl}" \
 ANTHROPIC_CUSTOM_HEADERS="${monitorHeader}" \
 ANTHROPIC_API_KEY="${anthropicKey}" \
 claude`
-  }, [apiKey, exampleBaseUrl])
+  }, [apiKey, exampleBaseUrl]) */
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 p-6 text-left">

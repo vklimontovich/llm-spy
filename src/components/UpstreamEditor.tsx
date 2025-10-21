@@ -340,7 +340,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     if (knownDefaults.includes(formData.url) && formData.url !== defaultUrl) {
       setFormData(prev => ({ ...prev, url: defaultUrl }))
     }
-  }, [formData.inputFormat, formData.outputFormat])
+  }, [formData.inputFormat, formData.outputFormat, formData.url])
 
   if (isLoading) return <LoadingState />
   if (error) return <ErrorState message={(error as Error).message} />
@@ -350,24 +350,6 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   return (
     <form onSubmit={handleSubmit} className="w-full">
       <div className="flex flex-col gap-6">
-        {/* Auto-update URL based on selected provider (input/output) */}
-        {(() => {
-          // derive provider that determines URL: explicit backend overrides input
-          const providerForUrl = formData.outputFormat || formData.inputFormat
-          const defaultUrl =
-            providerForUrl === 'anthropic'
-              ? 'https://api.anthropic.com'
-              : providerForUrl === 'openai'
-                ? 'https://api.openai.com'
-                : 'https://api.example.com'
-          // keep URL in sync when it matches a known default or is empty
-          // Using a micro effect via inline IIFE is not React-idiomatic; instead adjust via useEffect below
-          return null
-        })()}
-
-        {/* Keep URL synced with provider choice */}
-        {/* eslint-disable react-hooks/exhaustive-deps */}
-        {null}
         {/* Connection Instructions */}
         {!isNew && formData.name && (
           <div className="mb-6">
