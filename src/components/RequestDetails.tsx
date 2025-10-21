@@ -3,7 +3,7 @@
 import { Drawer } from 'antd'
 import ShareButton from './ShareButton'
 import RequestView from './RequestView'
-import { RequestResponse } from '@/app/(protected)/[workspace]/requests/page'
+import { RequestResponse } from '@/types/requests'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 interface RequestDetailsProps {

@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
 import { Button } from 'antd'
+import GettingStarted from './GettingStarted'
 import {
   Activity,
   Edit3,
@@ -206,16 +207,16 @@ const UpstreamCard = ({
 
 // Empty State Component
 const EmptyState = () => (
-  <div className="text-center py-12">
-    <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-      <Server className="w-8 h-8 text-gray-400" />
+  <div className="py-6">
+    <div className="mb-4 text-center">
+      <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
+        <Server className="w-8 h-8 text-gray-400" />
+      </div>
+      <h3 className="text-lg font-semibold text-gray-900">No upstreams configured</h3>
     </div>
-    <h3 className="text-lg font-semibold text-gray-900 mb-2">
-      No upstreams configured
-    </h3>
-    <p className="text-gray-500 mb-6">
-      Get started by creating your first upstream configuration.
-    </p>
+    <div className="max-w-2xl mx-auto w-full">
+      <GettingStarted />
+    </div>
   </div>
 )
 
