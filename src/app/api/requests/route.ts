@@ -31,9 +31,8 @@ export async function GET(request: NextRequest) {
             provider,
             request_model as "requestModel",
             response_model as "responseModel",
-            request_tokens as "requestTokens",
-            response_tokens as "responseTokens",
-            price_usd as "priceUsd",
+            usage,
+            pricing,
             duration_ms as "durationMs",
             CASE 
               WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
@@ -113,9 +112,8 @@ export async function GET(request: NextRequest) {
             provider,
             request_model as "requestModel",
             response_model as "responseModel",
-            request_tokens as "requestTokens",
-            response_tokens as "responseTokens",
-            price_usd as "priceUsd",
+            usage,
+            pricing,
             duration_ms as "durationMs",
             CASE 
               WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN

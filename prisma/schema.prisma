@@ -114,9 +114,8 @@ model Response {
   provider        String?
   requestModel    String?    @map("request_model")
   responseModel   String?    @map("response_model")
-  requestTokens   Int?       @map("request_tokens")
-  responseTokens  Int?       @map("response_tokens")
-  priceUsd        Float?     @map("price_usd")
+  // Full provider-specific usage block (as returned by the API)
+  usage           Json?
   durationMs      Int?       @map("duration_ms")
   pricing         Json?
   createdAt       DateTime   @default(now())

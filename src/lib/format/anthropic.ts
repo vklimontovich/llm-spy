@@ -527,7 +527,13 @@ export class AnthropicParser implements ProviderParser {
         if (response) {
           if (data.delta.stop_reason)
             response.stop_reason = data.delta.stop_reason
-          if (data.usage) response.usage = data.usage
+          // Merge usage updates to avoid dropping fields like input_tokens
+          if (data.usage) {
+            response.usage = {
+              ...(response.usage || {}),
+              ...data.usage,
+            }
+          }
         }
       }
     }

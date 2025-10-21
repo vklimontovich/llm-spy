@@ -9,8 +9,8 @@ import {
 } from '@/lib/route-helpers'
 import { getParserForProvider, detectProviderFromRequest } from '@/lib/format'
 import { isSSEResponse, reconstructSSEResponse } from '@/lib/sse-utils'
-import { getPricingForUsage } from '@/lib/pricing'
 import type { ConversationModel } from '@/lib/format/model'
+import { getPricing } from '@/lib/pricing'
 
 async function handleProxy(
   request: NextRequest,
@@ -184,10 +184,8 @@ async function handleProxy(
         let provider = upstream.headers?.['x-provider'] || null
         let requestModel: string | undefined
         let responseModel: string | undefined
-        let requestTokens: number | undefined
-        let responseTokens: number | undefined
-        let pricingData: any = null
-        let priceUsd: number | undefined
+        let usageRaw: any | undefined
+        let pricingData: any | undefined
 
         try {
           // Try to detect provider from request if not set
@@ -226,25 +224,16 @@ async function handleProxy(
               if (conversationModel) {
                 requestModel = conversationModel.models.request
                 responseModel = conversationModel.models.response
-                requestTokens = conversationModel.usage?.inputTokens
-                responseTokens = conversationModel.usage?.outputTokens
+                // Persist the raw usage block from provider if available
+                usageRaw = (responseJson as any)?.usage ?? conversationModel.usage
 
-                // Calculate pricing if we have usage data
-                if (requestTokens && responseTokens && responseModel) {
-                  const pricingInfo = await getPricingForUsage(
-                    responseModel,
-                    requestTokens,
-                    responseTokens
-                  )
-                  if (pricingInfo) {
-                    pricingData = {
-                      inputPricePerMillion:
-                        pricingInfo.pricing.inputPricePerMillion,
-                      outputPricePerMillion:
-                        pricingInfo.pricing.outputPricePerMillion,
-                      provider: pricingInfo.pricing.provider,
-                    }
-                    priceUsd = pricingInfo.totalPriceUsd
+                // Calculate pricing lookup; save raw cost node as-is
+                if (responseModel) {
+                  pricingData = await getPricing(responseModel)
+                  if (pricingData) {
+                    console.log(`[pricing] Found cost for ${responseModel}`)
+                  } else {
+                    console.warn(`[pricing] No cost found for model ${responseModel}`)
                   }
                 }
               }
@@ -257,7 +246,7 @@ async function handleProxy(
         }
 
         // Store in database with new fields
-        await prisma.response.create({
+        const saved = await prisma.response.create({
           data: {
             url: targetUrl,
             method,
@@ -271,13 +260,21 @@ async function handleProxy(
             provider,
             requestModel,
             responseModel,
-            requestTokens,
-            responseTokens,
+            usage: usageRaw,
             pricing: pricingData,
-            priceUsd,
             durationMs,
           },
         })
+        try {
+          console.log(
+            '[save] response saved:',
+            saved.id,
+            '| pricing:',
+            pricingData ? JSON.stringify(pricingData) : 'none',
+            '| usage:',
+            usageRaw ? 'present' : 'none'
+          )
+        } catch {}
       }
     )
 

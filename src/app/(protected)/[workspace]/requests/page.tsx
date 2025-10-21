@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Table, Button, Switch } from 'antd'
+import { Table, Button, Switch, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -30,9 +30,11 @@ export interface RequestResponse {
   provider?: string | null
   requestModel?: string | null
   responseModel?: string | null
-  requestTokens?: number | null
-  responseTokens?: number | null
-  priceUsd?: number | null
+  usage?: any | null
+  pricing?:
+    | Record<string, { input?: number; output?: number; cache_read?: number; cache_write?: number }>
+    | { input?: number; output?: number; cache_read?: number; cache_write?: number }
+    | null
   durationMs?: number | null
 }
 
@@ -143,8 +145,6 @@ export default function RequestsPage() {
 
   const formatPrice = (price: number | null | undefined) => {
     if (price == null) return '-'
-    if (price < 0.01) return `$${price.toFixed(6)}`
-    if (price < 1) return `$${price.toFixed(4)}`
     return `$${price.toFixed(2)}`
   }
 
@@ -152,6 +152,74 @@ export default function RequestsPage() {
     if (ms == null) return '-'
     if (ms < 1000) return `${ms}ms`
     return `${(ms / 1000).toFixed(2)}s`
+  }
+
+  const getInputTokens = (usage: any | null | undefined) => {
+    if (!usage) return 0
+    const base = Number(usage.input_tokens || 0)
+    const cacheCreate = Number(usage.cache_creation_input_tokens || 0)
+    const cacheRead = Number(usage.cache_read_input_tokens || 0)
+    return base + cacheCreate + cacheRead
+  }
+
+  const getOutputTokens = (usage: any | null | undefined) => {
+    if (!usage) return 0
+    return Number(usage.output_tokens || 0)
+  }
+
+  const getCachedTokens = (usage: any | null | undefined) => {
+    if (!usage) return 0
+    const read = Number(usage.cache_read_input_tokens || 0)
+    const flatCreate = Number(usage.cache_creation_input_tokens || 0)
+    const nestedCreate =
+      Number(usage.cache_creation?.ephemeral_1h_input_tokens || 0) +
+      Number(usage.cache_creation?.ephemeral_5m_input_tokens || 0)
+    const create = flatCreate || nestedCreate
+    return read + create
+  }
+
+  const computePriceUsd = (
+    pricing: any,
+    usage: any | null | undefined,
+    modelId?: string | null | undefined
+  ) => {
+    if (!pricing || !usage) return null
+
+    const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v)
+    const num = (v: any) => (v == null ? 0 : Number(v) || 0)
+
+    // Normalize pricing: either keyed by model or direct cost object
+    let cost: any = null
+    if (isObj(pricing)) {
+      const keys = Object.keys(pricing)
+      const looksKeyed = keys.some(k => isObj((pricing as any)[k]))
+      if (looksKeyed) {
+        const rec = pricing as Record<string, any>
+        const key = modelId && rec[modelId] ? modelId : keys[0]
+        cost = rec[key]
+      } else {
+        cost = pricing
+      }
+    }
+    if (!cost) return null
+
+    // Usage tokens with fallbacks for cache_creation nested fields
+    const inTokens = num(usage.input_tokens)
+    const rdTokens = num(usage.cache_read_input_tokens)
+    const wrTokensFlat = num(usage.cache_creation_input_tokens)
+    const wrTokensNested =
+      num(usage.cache_creation?.ephemeral_1h_input_tokens) +
+      num(usage.cache_creation?.ephemeral_5m_input_tokens)
+    const wrTokens = wrTokensFlat || wrTokensNested
+    const outTokens = num(usage.output_tokens)
+
+    // Pricing is per 1,000,000 tokens
+    const total =
+      (inTokens / 1_000_000) * num(cost.input) +
+      (rdTokens / 1_000_000) * (num(cost.cache_read) || num(cost.input)) +
+      (wrTokens / 1_000_000) * (num(cost.cache_write) || num(cost.input)) +
+      (outTokens / 1_000_000) * num(cost.output)
+    return total
   }
 
   const formatDate = (dateString: string) => {
@@ -214,21 +282,12 @@ export default function RequestsPage() {
       render: model => {
         if (!model) return <span className="text-xs text-gray-400">-</span>
 
-        // Shorten model names for display
-        const shortModel = model
-          .replace('claude-3-5-sonnet-20241022', 'claude-3.5-sonnet')
-          .replace('claude-3-opus-20240229', 'claude-3-opus')
-          .replace('claude-3-haiku-20240307', 'claude-3-haiku')
-          .replace('gpt-4o-mini', 'gpt-4o-mini')
-          .replace('gpt-4-turbo', 'gpt-4-turbo')
-          .replace('gpt-3.5-turbo', 'gpt-3.5')
-
         return (
           <span
             className="px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 whitespace-nowrap"
             title={model}
           >
-            {shortModel}
+            {model}
           </span>
         )
       },
@@ -289,36 +348,60 @@ export default function RequestsPage() {
       },
     },
     {
-      title: <span className="whitespace-nowrap">Input</span>,
-      dataIndex: 'requestTokens',
-      key: 'requestTokens',
+      title: (
+        <Tooltip title="Input tokens: base; cached (read+create) shown in parentheses if present">
+          <span className="whitespace-nowrap">Input</span>
+        </Tooltip>
+      ),
+      key: 'inputTokens',
       width: 70,
       align: 'right',
       fixed: 'right',
-      render: tokens => (
-        <span className="text-xs font-mono">{formatNumber(tokens)}</span>
-      ),
+      render: (_, record) => {
+        const base = Number(record.usage?.input_tokens || 0)
+        const cached = getCachedTokens(record.usage)
+        return (
+          <span className="text-xs font-mono" title="Prompt/input token count for this call (base; cached read+create)">
+            {formatNumber(base)}<br/>
+            <span className="whitespace-nowrap text-xs text-gray-500">
+              {cached > 0 ? ` (+${formatNumber(cached)} cached)` : ''}  
+            </span>
+            
+          </span>
+        )
+      },
     },
     {
-      title: <span className="whitespace-nowrap">Output</span>,
-      dataIndex: 'responseTokens',
-      key: 'responseTokens',
+      title: (
+        <Tooltip title="Output tokens generated by the model (completion)">
+          <span className="whitespace-nowrap">Output</span>
+        </Tooltip>
+      ),
+      key: 'outputTokens',
       width: 70,
       align: 'right',
       fixed: 'right',
-      render: tokens => (
-        <span className="text-xs font-mono">{formatNumber(tokens)}</span>
+      render: (_, record) => (
+        <span
+          className="text-xs font-mono"
+          title="Completion/output token count for this call"
+        >
+          {formatNumber(getOutputTokens(record.usage))}
+        </span>
       ),
     },
     {
       title: <span className="whitespace-nowrap">Price</span>,
-      dataIndex: 'priceUsd',
-      key: 'priceUsd',
+      key: 'price',
       width: 80,
       align: 'right',
       fixed: 'right',
-      render: price => (
-        <span className="text-xs font-mono">{formatPrice(price)}</span>
+      render: (_, record) => (
+        <span className="text-xs font-mono">
+          {formatPrice(
+            computePriceUsd(record.pricing, record.usage, record.responseModel)
+          )}
+        </span>
       ),
     },
     {
