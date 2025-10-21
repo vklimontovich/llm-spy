@@ -8,6 +8,7 @@ import {
   captureResponseBody,
 } from '@/lib/route-helpers'
 import { getParserForProvider, detectProviderFromRequest } from '@/lib/format'
+import { isSSEResponse, reconstructSSEResponse } from '@/lib/sse-utils'
 import { getPricingForUsage } from '@/lib/pricing'
 import type { ConversationModel } from '@/lib/format/model'
 
@@ -204,9 +205,19 @@ async function handleProxy(
               const requestJson = JSON.parse(
                 decompressedRequestBody.toString('utf-8')
               )
-              const responseJson = JSON.parse(
-                decompressedResponseBody.toString('utf-8')
-              )
+              // Parse response as JSON or reconstruct from SSE when streaming
+              let responseJson: any
+              const responseText = decompressedResponseBody.toString('utf-8')
+              if (isSSEResponse(responseHeaders)) {
+                responseJson = reconstructSSEResponse(responseText)
+              } else {
+                try {
+                  responseJson = JSON.parse(responseText)
+                } catch {
+                  // Fallback: attempt SSE reconstruction if JSON parsing fails
+                  responseJson = reconstructSSEResponse(responseText)
+                }
+              }
 
               conversationModel = parser.createConversation(
                 requestJson,

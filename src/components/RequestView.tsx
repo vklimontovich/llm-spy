@@ -53,24 +53,6 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
   const { conversation } = llmRequest
   const collapseItems: any[] = []
 
-  if (conversation.modelMessages && conversation.modelMessages.length > 0) {
-    collapseItems.push({
-      key: 'chat',
-      label: (
-        <div className="flex items-center gap-2">
-          <MessageSquare className="w-4 h-4" />
-          <span className="font-medium">Chat Messages</span>
-        </div>
-      ),
-      extra: (
-        <Badge
-          count={conversation.modelMessages.length}
-          style={{ backgroundColor: '#52c41a' }}
-        />
-      ),
-      children: <ChatView messages={conversation.modelMessages} />,
-    })
-  }
 
   if (conversation.tools && conversation.tools.length > 0) {
     collapseItems.push({
@@ -95,6 +77,25 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
     })
   }
 
+  if (conversation.modelMessages && conversation.modelMessages.length > 0) {
+    collapseItems.push({
+      key: 'chat',
+      label: (
+        <div className="flex items-center gap-2">
+          <MessageSquare className="w-4 h-4" />
+          <span className="font-medium">Chat Messages</span>
+        </div>
+      ),
+      extra: (
+        <Badge
+          count={conversation.modelMessages.length}
+          style={{ backgroundColor: '#52c41a' }}
+        />
+      ),
+      children: <ChatView messages={conversation.modelMessages} />,
+    })
+  }
+  
   if (conversation.meta) {
     collapseItems.push({
       key: 'meta',

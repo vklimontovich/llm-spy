@@ -15,6 +15,26 @@ let pricingCache: Record<string, ModelPricing> | null = null
 let lastFetchTime = 0
 const CACHE_DURATION = 1000 * 60 * 60 * 24 // 24 hours
 
+type ModelsDevPricing = {
+  input?: number
+  prompt?: number
+  output?: number
+  completion?: number
+}
+
+type ModelsDevModel = {
+  pricing?: ModelsDevPricing
+  provider?: { name?: string }
+}
+
+type ModelsDevResponse = {
+  models?: Record<string, ModelsDevModel> | ModelsDevModel[]
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return !!value && typeof value === 'object' && !Array.isArray(value)
+}
+
 async function fetchPricingData(): Promise<Record<string, ModelPricing>> {
   try {
     const response = await fetch('https://models.dev/api.json', {
@@ -26,24 +46,37 @@ async function fetchPricingData(): Promise<Record<string, ModelPricing>> {
       return {}
     }
 
-    const data = await response.json()
+    const raw = (await response.json()) as unknown
+    const data: ModelsDevResponse = isPlainObject(raw) ? (raw as ModelsDevResponse) : {}
     const pricing: Record<string, ModelPricing> = {}
 
-    // Parse the models.dev data
-    for (const [modelId, modelData] of Object.entries(data.models)) {
-      if (modelData && typeof modelData === 'object') {
-        const model = modelData as any
-        if (model.pricing) {
-          const inputPrice = model.pricing.input ?? model.pricing.prompt ?? 0
-          const outputPrice =
-            model.pricing.output ?? model.pricing.completion ?? 0
+    // Ensure format is as expected before parsing
+    const models = data?.models
+    if (!models || (typeof models !== 'object' && !Array.isArray(models))) {
+      console.warn('models.dev api.json missing or invalid `models` field')
+      return {}
+    }
 
-          // models.dev prices are typically per 1K tokens, convert to per million
-          pricing[modelId] = {
-            inputPricePerMillion: inputPrice * 1000,
-            outputPricePerMillion: outputPrice * 1000,
-            provider: model.provider?.name?.toLowerCase() || 'unknown',
-          }
+    // Normalize to entries for iteration regardless of object/array shape
+    const entries: [string, ModelsDevModel][] = Array.isArray(models)
+      ? (models as ModelsDevModel[]).map((m, i) => [String(i), m])
+      : Object.entries(models as Record<string, ModelsDevModel>)
+
+    // Parse the models.dev data safely
+    for (const [modelId, modelData] of entries) {
+      if (!isPlainObject(modelData)) continue
+      const model = modelData as ModelsDevModel
+      if (!isPlainObject(model.pricing) && model.pricing !== undefined) continue
+
+      if (model.pricing) {
+        const inputPrice = model.pricing.input ?? model.pricing.prompt ?? 0
+        const outputPrice = model.pricing.output ?? model.pricing.completion ?? 0
+
+        // models.dev prices are typically per 1K tokens, convert to per million
+        pricing[modelId] = {
+          inputPricePerMillion: inputPrice * 1000,
+          outputPricePerMillion: outputPrice * 1000,
+          provider: model.provider?.name?.toLowerCase() || 'unknown',
         }
       }
     }
@@ -64,6 +97,7 @@ async function ensurePricingLoaded(): Promise<Record<string, ModelPricing>> {
   }
 
   // Fetch new pricing data
+  // If fetching fails, fall back to an empty cache to avoid blocking requests
   pricingCache = await fetchPricingData()
   lastFetchTime = now
   return pricingCache
