@@ -154,13 +154,6 @@ export default function RequestsPage() {
     return `${(ms / 1000).toFixed(2)}s`
   }
 
-  const getInputTokens = (usage: any | null | undefined) => {
-    if (!usage) return 0
-    const base = Number(usage.input_tokens || 0)
-    const cacheCreate = Number(usage.cache_creation_input_tokens || 0)
-    const cacheRead = Number(usage.cache_read_input_tokens || 0)
-    return base + cacheCreate + cacheRead
-  }
 
   const getOutputTokens = (usage: any | null | undefined) => {
     if (!usage) return 0
