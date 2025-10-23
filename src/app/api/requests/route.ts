@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
 import { checkWorkspaceAuth } from '@/lib/auth'
+import { select_llm_calls } from '@/lib/db_queries'
+import { FiltersSchema } from '@/types/requests'
 
 export async function GET(request: NextRequest) {
   try {
@@ -8,7 +9,7 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url)
     const cursor = searchParams.get('cursor')
     const limit = parseInt(searchParams.get('limit') || '20', 10)
-    const previewLength = 50 // Configurable preview length
+    const filterParam = searchParams.get('filter')
 
     if (limit > 100) {
       return NextResponse.json(
@@ -17,171 +18,34 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    // Use raw query to generate preview on database side
-    const query = cursor
-      ? prisma.$queryRaw<any[]>`
-          SELECT 
-            id,
-            url,
-            method,
-            status,
-            "requestHeaders",
-            "responseHeaders",
-            "createdAt",
-            provider,
-            request_model as "requestModel",
-            response_model as "responseModel",
-            usage,
-            pricing,
-            duration_ms as "durationMs",
-            CASE 
-              WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
-                CONCAT(
-                  LEFT(REGEXP_REPLACE(
-                    COALESCE(
-                      CASE 
-                        WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                          CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                        ELSE 
-                          CONVERT_FROM("requestBody", 'UTF8')
-                      END,
-                      ENCODE("requestBody", 'escape')
-                    ), 
-                    E'[\\n\\r\\t]+', ' ', 'g'
-                  ), ${previewLength}::int),
-                  E'\\n',
-                  '→ ',
-                  LEFT(REGEXP_REPLACE(
-                    COALESCE(
-                      CASE 
-                        WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                          CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                        ELSE 
-                          CONVERT_FROM("responseBody", 'UTF8')
-                    END,
-                      ENCODE("responseBody", 'escape')
-                    ), 
-                    E'[\\n\\r\\t]+', ' ', 'g'
-                  ), ${previewLength}::int)
-                )
-              WHEN "requestBody" IS NOT NULL THEN
-                LEFT(REGEXP_REPLACE(
-                  COALESCE(
-                    CASE 
-                      WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                        CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                      ELSE 
-                        CONVERT_FROM("requestBody", 'UTF8')
-                    END,
-                    ENCODE("requestBody", 'escape')
-                  ), 
-                  E'[\\n\\r\\t]+', ' ', 'g'
-                ), ${previewLength * 2}::int)
-              WHEN "responseBody" IS NOT NULL THEN
-                CONCAT('→ ', LEFT(REGEXP_REPLACE(
-                  COALESCE(
-                    CASE 
-                      WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                        CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                      ELSE 
-                        CONVERT_FROM("responseBody", 'UTF8')
-                    END,
-                    ENCODE("responseBody", 'escape')
-                  ), 
-                  E'[\\n\\r\\t]+', ' ', 'g'
-                ), ${previewLength * 2}::int))
-              ELSE '-'
-            END as preview,
-            COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
-            COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"
-          FROM responses
-          WHERE workspace_id = ${workspace.id}
-            AND "createdAt" < (SELECT "createdAt" FROM responses WHERE id = ${cursor})
-          ORDER BY "createdAt" DESC
-          LIMIT ${limit + 1}
-        `
-      : prisma.$queryRaw<any[]>`
-          SELECT 
-            id,
-            url,
-            method,
-            status,
-            "requestHeaders",
-            "responseHeaders",
-            "createdAt",
-            provider,
-            request_model as "requestModel",
-            response_model as "responseModel",
-            usage,
-            pricing,
-            duration_ms as "durationMs",
-            CASE 
-              WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
-                CONCAT(
-                  LEFT(REGEXP_REPLACE(
-                    COALESCE(
-                      CASE 
-                        WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                          CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                        ELSE 
-                          CONVERT_FROM("requestBody", 'UTF8')
-                      END,
-                      ENCODE("requestBody", 'escape')
-                    ), 
-                    E'[\\n\\r\\t]+', ' ', 'g'
-                  ), ${previewLength}::int),
-                  E'\\n',
-                  '→ ',
-                  LEFT(REGEXP_REPLACE(
-                    COALESCE(
-                      CASE 
-                        WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                          CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                        ELSE 
-                          CONVERT_FROM("responseBody", 'UTF8')
-                    END,
-                      ENCODE("responseBody", 'escape')
-                    ), 
-                    E'[\\n\\r\\t]+', ' ', 'g'
-                  ), ${previewLength}::int)
-                )
-              WHEN "requestBody" IS NOT NULL THEN
-                LEFT(REGEXP_REPLACE(
-                  COALESCE(
-                    CASE 
-                      WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                        CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                      ELSE 
-                        CONVERT_FROM("requestBody", 'UTF8')
-                    END,
-                    ENCODE("requestBody", 'escape')
-                  ), 
-                  E'[\\n\\r\\t]+', ' ', 'g'
-                ), ${previewLength * 2}::int)
-              WHEN "responseBody" IS NOT NULL THEN
-                CONCAT('→ ', LEFT(REGEXP_REPLACE(
-                  COALESCE(
-                    CASE 
-                      WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN 
-                        CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                      ELSE 
-                        CONVERT_FROM("responseBody", 'UTF8')
-                    END,
-                    ENCODE("responseBody", 'escape')
-                  ), 
-                  E'[\\n\\r\\t]+', ' ', 'g'
-                ), ${previewLength * 2}::int))
-              ELSE '-'
-            END as preview,
-            COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
-            COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"
-          FROM responses
-          WHERE workspace_id = ${workspace.id}
-          ORDER BY "createdAt" DESC
-          LIMIT ${limit + 1}
-        `
+    // Parse and validate filters
+    let filters: any[] = []
+    if (filterParam) {
+      try {
+        const parsedFilters = JSON.parse(filterParam)
+        const validationResult = FiltersSchema.safeParse(parsedFilters)
+        if (!validationResult.success) {
+          return NextResponse.json(
+            { error: 'Invalid filter format', details: validationResult.error },
+            { status: 400 }
+          )
+        }
+        filters = validationResult.data
+      } catch {
+        return NextResponse.json(
+          { error: 'Invalid JSON in filter parameter' },
+          { status: 400 }
+        )
+      }
+    }
 
-    const responses = await query
+    // Use utility function to fetch LLM calls
+    const responses = await select_llm_calls({
+      workspaceId: workspace.id,
+      cursor,
+      limit,
+      filters,
+    })
 
     const hasNextPage = responses.length > limit
     const items = hasNextPage ? responses.slice(0, -1) : responses

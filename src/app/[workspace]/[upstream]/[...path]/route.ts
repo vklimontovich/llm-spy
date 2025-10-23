@@ -11,6 +11,7 @@ import { getParserForProvider, detectProviderFromRequest } from '@/lib/format'
 import { isSSEResponse, reconstructSSEResponse } from '@/lib/sse-utils'
 import type { ConversationModel } from '@/lib/format/model'
 import { getPricing } from '@/lib/pricing'
+import { extractConversationId } from '@/lib/session-utils'
 
 async function handleProxy(
   request: NextRequest,
@@ -102,6 +103,7 @@ async function handleProxy(
         responseHeaders = { 'content-type': 'text/plain' }
       }
 
+      const conversationId = extractConversationId(requestHeaders)
       await prisma.response.create({
         data: {
           url: request.url,
@@ -111,6 +113,7 @@ async function handleProxy(
           responseBody: Buffer.from(responseBody),
           requestHeaders,
           responseHeaders,
+          conversationId,
           workspaceId: foundWorkspace.id,
         },
       })
@@ -246,6 +249,7 @@ async function handleProxy(
         }
 
         // Store in database with new fields
+        const conversationId = extractConversationId(requestHeaders)
         const saved = await prisma.response.create({
           data: {
             url: targetUrl,
@@ -255,6 +259,7 @@ async function handleProxy(
             responseBody: decompressedResponseBody,
             requestHeaders,
             responseHeaders,
+            conversationId,
             workspaceId: foundWorkspace.id,
             upstreamId: upstream.id,
             provider,

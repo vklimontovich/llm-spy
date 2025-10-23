@@ -7,23 +7,75 @@ import { useEffect, useState } from 'react'
 import { RefreshCw } from 'lucide-react'
 import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
-import { extractSessionId } from '@/lib/session-utils'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useWorkspaceApi } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { RequestResponse } from '@/types/requests'
+import { LlmCall, Filter } from '@/types/requests'
 
 const PAGE_SIZE = 100
 
+interface FilterDisplayProps {
+  filters: Filter[]
+  onRemove: (index: number) => void
+  onClearAll: () => void
+}
+
+function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
+  if (filters.length === 0) return null
+
+  return (
+    <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
+      <div className="flex items-center justify-between mb-2">
+        <div className="flex items-center gap-2">
+          <span className="text-xs font-medium text-gray-700">Filters</span>
+          <span className="text-xs text-gray-500">
+            ({filters.length})
+          </span>
+        </div>
+        <button
+          onClick={onClearAll}
+          className="text-xs text-blue-600 hover:text-blue-800"
+        >
+          Clear all
+        </button>
+      </div>
+      <div className="flex flex-wrap gap-2">
+        {filters.map((filter, index) => (
+          <div
+            key={index}
+            className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-gray-300 rounded text-xs"
+          >
+            <span className="text-gray-600">
+              {filter.field === 'conversationId' ? 'Conversation' : filter.field}
+            </span>
+            <span className="text-gray-400">=</span>
+            <span className="font-mono text-gray-900">
+              {filter.value || filter.values?.join(', ')}
+            </span>
+            <button
+              onClick={() => onRemove(index)}
+              className="ml-1 text-gray-400 hover:text-gray-600"
+              title="Remove filter"
+            >
+              ×
+            </button>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function LlmCallsTable() {
   const [selectedRequest, setSelectedRequest] =
-    useState<RequestResponse | null>(null)
+    useState<LlmCall | null>(null)
   const [liveRefresh, setLiveRefresh] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
-  const [allRequests, setAllRequests] = useState<RequestResponse[]>([])
+  const [allRequests, setAllRequests] = useState<LlmCall[]>([])
+  const [filters, setFilters] = useState<Filter[]>([])
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -31,15 +83,35 @@ export default function LlmCallsTable() {
   const api = useWorkspaceApi()
   const { workspace } = useWorkspace()
 
+  // Load filters from URL on mount
+  useEffect(() => {
+    const filterParam = searchParams.get('filter')
+    if (filterParam) {
+      try {
+        const parsed = JSON.parse(filterParam)
+        if (Array.isArray(parsed)) {
+          setFilters(parsed)
+        }
+      } catch {
+        // Ignore invalid filter params
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []) // Only run on mount
+
   const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['requests', offset],
+    queryKey: ['requests', offset, filters],
     queryFn: async () => {
-      const response = await api.get('/requests', {
-        params: {
-          limit: PAGE_SIZE,
-          offset: offset,
-        },
-      })
+      const params: any = {
+        limit: PAGE_SIZE,
+        offset: offset,
+      }
+
+      if (filters.length > 0) {
+        params.filter = JSON.stringify(filters)
+      }
+
+      const response = await api.get('/requests', { params })
       const result = response.data
       setHasMore(result.items && result.items.length === PAGE_SIZE)
       return result
@@ -99,6 +171,43 @@ export default function LlmCallsTable() {
     setHasMore(true)
     queryClient.invalidateQueries({ queryKey: ['requests'] })
     refetch()
+  }
+
+  const updateFiltersInUrl = (newFilters: Filter[]) => {
+    const params = new URLSearchParams(searchParams.toString())
+    if (newFilters.length > 0) {
+      params.set('filter', JSON.stringify(newFilters))
+    } else {
+      params.delete('filter')
+    }
+    const newUrl = params.toString()
+      ? `/${workspace.slug}/requests?${params.toString()}`
+      : `/${workspace.slug}/requests`
+    router.push(newUrl, { scroll: false })
+  }
+
+  const addFilter = (filter: Filter) => {
+    // Check if filter already exists
+    const exists = filters.some(
+      f => f.field === filter.field && f.value === filter.value
+    )
+    if (!exists) {
+      const newFilters = [...filters, filter]
+      setFilters(newFilters)
+      setOffset(0)
+      setAllRequests([])
+      setHasMore(true)
+      updateFiltersInUrl(newFilters)
+    }
+  }
+
+  const removeFilter = (index: number) => {
+    const newFilters = filters.filter((_, i) => i !== index)
+    setFilters(newFilters)
+    setOffset(0)
+    setAllRequests([])
+    setHasMore(true)
+    updateFiltersInUrl(newFilters)
   }
 
   const handleLoadMore = async () => {
@@ -209,7 +318,7 @@ export default function LlmCallsTable() {
     }
   }
 
-  const columns: ColumnsType<RequestResponse> = [
+  const columns: ColumnsType<LlmCall> = [
     {
       title: 'Time',
       dataIndex: 'createdAt',
@@ -282,15 +391,22 @@ export default function LlmCallsTable() {
       },
     },
     {
-      title: <span className="whitespace-nowrap">Session</span>,
-      key: 'sessionId',
+      title: <span className="whitespace-nowrap">Conversation</span>,
+      key: 'conversationId',
       width: 70,
       render: (_, record) => {
-        const sessionId = extractSessionId(record.requestHeaders)
-        if (!sessionId) return <span className="text-xs text-gray-400">-</span>
+        if (!record.conversationId) return <span className="text-xs text-gray-400">-</span>
+        const conversationId = record.conversationId
         return (
-          <span className="text-xs font-mono text-blue-600" title={sessionId}>
-            {sessionId}
+          <span
+            className="text-xs font-mono text-blue-600 cursor-pointer hover:underline"
+            title={conversationId}
+            onClick={(e) => {
+              e.stopPropagation()
+              addFilter({ field: 'conversationId', expr: '=', value: conversationId })
+            }}
+          >
+            {conversationId}
           </span>
         )
       },
@@ -447,6 +563,17 @@ export default function LlmCallsTable() {
             />
           </div>
         </div>
+        <FilterDisplay
+          filters={filters}
+          onRemove={removeFilter}
+          onClearAll={() => {
+            setFilters([])
+            setOffset(0)
+            setAllRequests([])
+            setHasMore(true)
+            updateFiltersInUrl([])
+          }}
+        />
         <div className="flex items-center justify-between mb-4">
           <div />
           {lastRefreshed && (

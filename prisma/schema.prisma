@@ -105,7 +105,7 @@ model Response {
   responseBody    Bytes?
   requestHeaders  Json
   responseHeaders Json
-  sessionId       String?
+  conversationId  String?    @map("conversation_id")
   public          Boolean    @default(false)
   workspaceId     String?    @map("workspace_id")
   workspace       Workspace? @relation(fields: [workspaceId], references: [id])
@@ -120,7 +120,7 @@ model Response {
   pricing         Json?
   createdAt       DateTime   @default(now())
 
-  @@index([sessionId])
+  @@index([conversationId])
   @@index([public])
   @@index([workspaceId])
   @@map("responses")

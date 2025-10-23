@@ -1,6 +1,6 @@
 import { z } from 'zod'
 
-export const RequestResponseSchema = z.object({
+export const LlmCallSchema = z.object({
   id: z.string(),
   url: z.string(),
   method: z.string(),
@@ -10,6 +10,7 @@ export const RequestResponseSchema = z.object({
   responseContentType: z.string(),
   requestHeaders: z.record(z.any()),
   responseHeaders: z.record(z.any()),
+  conversationId: z.string().nullable().optional(),
   createdAt: z.string(),
   public: z.boolean().optional(),
   preview: z.string(),
@@ -22,4 +23,35 @@ export const RequestResponseSchema = z.object({
   durationMs: z.number().nullable().optional(),
 })
 
-export type RequestResponse = z.infer<typeof RequestResponseSchema>
+export type LlmCall = z.infer<typeof LlmCallSchema>
+
+// Keep old names for backwards compatibility
+export const RequestResponseSchema = LlmCallSchema
+export type RequestResponse = LlmCall
+
+// Filter types
+export const FilterSchema = z.object({
+  field: z.string(),
+  expr: z.enum(['=']).default('='),
+  value: z.string().optional(),
+  values: z.array(z.string()).optional(),
+}).refine(
+  (data) => data.value !== undefined || data.values !== undefined,
+  { message: 'Either value or values must be provided' }
+)
+
+export type Filter = z.infer<typeof FilterSchema>
+
+export const FiltersSchema = z.array(FilterSchema)
+
+export type Filters = z.infer<typeof FiltersSchema>
+
+// Conversation types
+export const ConversationSchema = z.object({
+  conversationId: z.string(),
+  lastLlmCall: z.string(), // ISO date string
+  usage: z.any().nullable(),
+  totalPrice: z.number().nullable(),
+})
+
+export type Conversation = z.infer<typeof ConversationSchema>
