@@ -1,0 +1,5 @@
+User-agent: *
+Disallow: /share
+Disallow: /share?*
+Disallow: /api/requests/*/public
+Disallow: /api/requests/*/share
