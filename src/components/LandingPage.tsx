@@ -18,7 +18,7 @@ import {
 } from 'lucide-react'
 import Logo from './Logo'
 import TerminalWindow from './TerminalWindow'
-import BrowserScreenshot from './BrowserScreenshot'
+import ScreenshotGallery from './ScreenshotGallery'
 import { copy, DOMAIN } from '@/lib/copy'
 
 interface LandingPageProps {
@@ -342,13 +342,7 @@ $ claude
 
         <ArrowDivider />
 
-        <div className="relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-purple-400 to-blue-400 blur-3xl opacity-20"></div>
-          <BrowserScreenshot
-            imageSrc="/landing-screenshot.png"
-            addressBarUrl={`${DOMAIN}/workspace-1/requests`}
-          />
-        </div>
+        <ScreenshotGallery />
       </Section>
 
       {/* How It Works */}
