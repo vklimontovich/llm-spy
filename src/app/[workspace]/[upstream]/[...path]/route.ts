@@ -1,17 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import {
-  decompressResponse,
-  validateAuthKey,
-  extractHeaders,
-  applyUpstreamHeaders,
-  captureResponseBody,
-} from '@/lib/route-helpers'
-import { getParserForProvider, detectProviderFromRequest } from '@/lib/format'
-import { isSSEResponse, reconstructSSEResponse } from '@/lib/sse-utils'
+import { applyUpstreamHeaders, authGetParams, captureResponseBody, decompressResponse, extractHeaders, validateAuthKey } from '@/lib/route-helpers'
+import { detectProviderFromRequest, getParserForProvider } from '@/lib/format'
+import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
 import type { ConversationModel } from '@/lib/format/model'
 import { getPricing } from '@/lib/pricing'
 import { extractConversationId } from '@/lib/session-utils'
+import { getPreview } from '@/lib/preview'
 
 async function handleProxy(
   request: NextRequest,
@@ -125,11 +120,18 @@ async function handleProxy(
     }
 
     const url = new URL(request.url)
-    const targetUrl = `${upstream.url}${url.pathname.replace(`/${workspace}/${upstreamName}`, '')}${url.search}`
+
+    // Filter out unwanted query parameters
+    const paramsToRemove = [authGetParams]
+    const filteredSearchParams = new URLSearchParams(url.searchParams)
+    paramsToRemove.forEach(param => filteredSearchParams.delete(param))
+    const filteredSearch = filteredSearchParams.toString()
+    const searchString = filteredSearch ? `?${filteredSearch}` : ''
+
+    const targetUrl = `${upstream.url}${url.pathname.replace(`/${workspace}/${upstreamName}`, '')}${searchString}`
     console.log(
       `Proxying ${method.toUpperCase()} ${request.url} -> ${targetUrl}`
     )
-    console.log(`Request headers:\n`, requestHeaders)
 
     // Track start time for duration
     const startTime = Date.now()
@@ -189,6 +191,7 @@ async function handleProxy(
         let responseModel: string | undefined
         let usageRaw: any | undefined
         let pricingData: any | undefined
+        let preview: { input: string; output: string } | undefined
 
         try {
           // Try to detect provider from request if not set
@@ -210,13 +213,13 @@ async function handleProxy(
               let responseJson: any
               const responseText = decompressedResponseBody.toString('utf-8')
               if (isSSEResponse(responseHeaders)) {
-                responseJson = reconstructSSEResponse(responseText)
+                responseJson = parser.getJsonFromSSE(parseSSEEvents(responseText))
               } else {
                 try {
                   responseJson = JSON.parse(responseText)
                 } catch {
                   // Fallback: attempt SSE reconstruction if JSON parsing fails
-                  responseJson = reconstructSSEResponse(responseText)
+                  responseJson = parser.getJsonFromSSE(parseSSEEvents(responseText))
                 }
               }
 
@@ -238,6 +241,16 @@ async function handleProxy(
                   } else {
                     console.warn(`[pricing] No cost found for model ${responseModel}`)
                   }
+                }
+
+                // Generate preview from conversation
+                const messages = conversationModel.modelMessages
+                const lastUserMessage = messages.findLast(m => m.role === 'user')
+                const lastAssistantMessage = messages.findLast(m => m.role === 'assistant')
+
+                preview = {
+                  input: getPreview(lastUserMessage, 100),
+                  output: getPreview(lastAssistantMessage, 100),
                 }
               }
             } catch (parseError) {
@@ -267,6 +280,7 @@ async function handleProxy(
             responseModel,
             usage: usageRaw,
             pricing: pricingData,
+            preview,
             durationMs,
           },
         })

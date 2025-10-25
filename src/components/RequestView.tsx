@@ -40,11 +40,11 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
           <MessageSquare className="w-8 h-8 text-gray-400" />
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">
-          No Conversation Data
+          Chat View is not Available
         </h3>
         <p className="text-gray-500 text-center max-w-md">
-          This request does not appear to be an AI conversation. Check the Raw
-          Request and Raw Response tabs for details.
+          {llmRequest.conversationNotAvailableReason ||  <>This request does not appear to be an AI conversation. Check the Raw
+          Request and Raw Response tabs for details</>}.
         </p>
       </div>
     )
@@ -251,7 +251,7 @@ const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
         `No parser found for provider ${llmRequest.provider}`
       )
       if (provider) {
-        eventsToDisplay = provider.parseSSE(events)
+        eventsToDisplay = provider.getJsonFromSSE(events)
       }
     } else {
       eventsToDisplay = events
@@ -307,7 +307,7 @@ export default function RequestView({
     tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
 
   // Fetch combined data (request, response, and conversation)
-  const { data: combinedData, isLoading } = useQuery({
+  const { data: combinedData, isLoading, error } = useQuery({
     queryKey: ['body', requestId, 'combined'],
     queryFn: async () => {
       const config = workspaceId
@@ -337,6 +337,23 @@ export default function RequestView({
     return (
       <div className="flex justify-center items-center h-64">
         <Spin size="large" />
+      </div>
+    )
+  }
+
+  // Show error state if API call failed
+  if (error) {
+    return (
+      <div className="flex flex-col items-center justify-center py-12">
+        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mb-4">
+          <MessageSquare className="w-8 h-8 text-red-600" />
+        </div>
+        <h3 className="text-lg font-semibold text-red-900 mb-2">
+          Error during conversation rendering
+        </h3>
+        <p className="text-gray-500 text-sm text-center max-w-md">
+          Check the browser console for detailed error logs.
+        </p>
       </div>
     )
   }

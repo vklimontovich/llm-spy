@@ -21,6 +21,7 @@ export const LlmCallSchema = z.object({
   // Pricing shape is intentionally untyped (any), as requested
   pricing: z.any().nullable().optional(),
   durationMs: z.number().nullable().optional(),
+  price: z.number().nullable().optional(),
 })
 
 export type LlmCall = z.infer<typeof LlmCallSchema>

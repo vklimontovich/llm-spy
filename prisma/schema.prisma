@@ -118,6 +118,7 @@ model Response {
   usage           Json?
   durationMs      Int?       @map("duration_ms")
   pricing         Json?
+  preview         Json?
   createdAt       DateTime   @default(now())
 
   @@index([conversationId])

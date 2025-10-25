@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import type { Tool, ModelMessage } from 'ai'
-import type { ConversationModel, ProviderParser } from '@/lib/format/model'
+import type { ConversationModel, ProviderParser, Usage } from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
 // ──────────────────────────────────────────────────────────
@@ -71,7 +71,7 @@ export const AnthropicWireSchema = z.object({
               type: z.string(),
             })
             .optional(),
-        })
+        }),
       ),
     ])
     .optional(),
@@ -86,7 +86,7 @@ export type AnthropicWire = z.infer<typeof AnthropicWireSchema>
 
 export function anthropicToModel(
   payloadUnknown: unknown,
-  responseUnknown?: unknown
+  responseUnknown?: unknown,
 ): ConversationModel {
   const payload = AnthropicWireSchema.parse(payloadUnknown)
 
@@ -315,7 +315,7 @@ export function anthropicToModel(
         name: t.name,
         description: t.description,
         inputSchema: t.input_schema || {}, // AI SDK uses 'inputSchema'
-      }) as Tool
+      }) as Tool,
   )
 
   return {
@@ -339,7 +339,7 @@ function normalizeToolResult(raw: unknown): unknown {
       .map(p =>
         p && typeof p === 'object' && (p as any).type === 'text'
           ? String((p as any).text ?? '')
-          : ''
+          : '',
       )
       .filter(Boolean)
       .join('\n')
@@ -358,18 +358,13 @@ export class AnthropicParser implements ProviderParser {
 
   createConversation(
     payloadUnknown: unknown | null,
-    responseUnknown?: unknown
+    responseUnknown?: unknown,
   ): ConversationModel | undefined {
-    try {
-      if (payloadUnknown === null && responseUnknown) {
-        // When payload is null, create minimal conversation from response only
-        return this.responseToModel(responseUnknown)
-      }
-      return anthropicToModel(payloadUnknown, responseUnknown)
-    } catch (error) {
-      console.error('Failed to parse Anthropic conversation:', error)
-      return undefined
+    if (payloadUnknown === null && responseUnknown) {
+      // When payload is null, create minimal conversation from response only
+      return this.responseToModel(responseUnknown)
     }
+    return anthropicToModel(payloadUnknown, responseUnknown)
   }
 
   private responseToModel(responseUnknown: unknown): ConversationModel {
@@ -495,7 +490,7 @@ export class AnthropicParser implements ProviderParser {
     }
   }
 
-  parseSSE(events: SSEEvent[]): any | undefined {
+  getJsonFromSSE(events: SSEEvent[]): any | undefined {
     if (events.length === 0) return undefined
 
     let response: any = null
@@ -543,5 +538,27 @@ export class AnthropicParser implements ProviderParser {
     }
 
     return response
+  }
+
+  getUsage(usage: any): Usage | null {
+    if (!usage) return null
+
+    const inputTokens = Number(usage.input_tokens || 0)
+    const outputTokens = Number(usage.output_tokens || 0)
+
+    // Handle cache tokens - both flat and nested formats
+    const cacheReadTokens = Number(usage.cache_read_input_tokens || 0)
+    const cacheWriteFlat = Number(usage.cache_creation_input_tokens || 0)
+    const cacheWriteNested =
+      Number(usage.cache_creation?.ephemeral_1h_input_tokens || 0) +
+      Number(usage.cache_creation?.ephemeral_5m_input_tokens || 0)
+    const cacheWriteTokens = cacheWriteFlat || cacheWriteNested
+
+    return {
+      inputTokens,
+      outputTokens,
+      cacheReadTokens: cacheReadTokens > 0 ? cacheReadTokens : undefined,
+      cacheWriteTokens: cacheWriteTokens > 0 ? cacheWriteTokens : undefined,
+    }
   }
 }

@@ -328,7 +328,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     const defaultUrl =
       providerForUrl === 'anthropic'
         ? 'https://api.anthropic.com'
-        : providerForUrl === 'openai'
+        : providerForUrl === 'openai-chat' || providerForUrl === 'openai-responses'
           ? 'https://api.openai.com'
           : 'https://api.example.com'
     const knownDefaults = [
@@ -396,7 +396,8 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                   { value: 'auto', label: 'Auto-detect' },
                   { value: 'otel', label: 'Open Telemetry' },
                   { value: 'anthropic', label: 'Anthropic' },
-                  { value: 'openai', label: 'OpenAI' },
+                  { value: 'openai-chat', label: 'OpenAI Chat Completion' },
+                  { value: 'openai-responses', label: 'OpenAI Responses' },
                 ]}
                 className="w-full"
                 size="large"
@@ -472,7 +473,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                   placeholder={
                     providerForUrl === 'anthropic'
                       ? 'https://api.anthropic.com'
-                      : providerForUrl === 'openai'
+                      : providerForUrl === 'openai-chat' || providerForUrl === 'openai-responses'
                         ? 'https://api.openai.com'
                         : 'https://api.example.com'
                   }
@@ -492,7 +493,8 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                   options={[
                     { value: '', label: 'Same as input' },
                     { value: 'anthropic', label: 'Anthropic' },
-                    { value: 'openai', label: 'OpenAI' },
+                    { value: 'openai-chat', label: 'OpenAI Chat Completion' },
+                    { value: 'openai-responses', label: 'OpenAI Responses' },
                   ]}
                   className="w-full"
                   size="large"

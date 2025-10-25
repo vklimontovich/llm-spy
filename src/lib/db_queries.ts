@@ -1,12 +1,13 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { Filters } from '@/types/requests'
+import { Filters, LlmCall } from '@/types/requests'
+import { getParserForProvider } from '@/lib/format'
+import { computePriceUsd } from '@/lib/pricing'
 
 export interface LlmCallsSelectParams {
   workspaceId: string
   cursor?: string | null
   limit: number
-  previewLength?: number
   filters?: Filters
 }
 
@@ -14,9 +15,8 @@ export async function select_llm_calls({
   workspaceId,
   cursor,
   limit,
-  previewLength = 50,
   filters = [],
-}: LlmCallsSelectParams) {
+}: LlmCallsSelectParams): Promise<LlmCall[]> {
   // Build WHERE clause for filters
   let whereClause = Prisma.sql`workspace_id = ${workspaceId}`
 
@@ -56,64 +56,7 @@ export async function select_llm_calls({
       pricing,
       duration_ms as "durationMs",
       conversation_id as "conversationId",
-      CASE
-        WHEN "requestBody" IS NOT NULL AND "responseBody" IS NOT NULL THEN
-          CONCAT(
-            LEFT(REGEXP_REPLACE(
-              COALESCE(
-                CASE
-                  WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN
-                    CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                  ELSE
-                    CONVERT_FROM("requestBody", 'UTF8')
-                END,
-                ENCODE("requestBody", 'escape')
-              ),
-              E'[\\n\\r\\t]+', ' ', 'g'
-            ), ${previewLength}::int),
-            E'\\n',
-            '→ ',
-            LEFT(REGEXP_REPLACE(
-              COALESCE(
-                CASE
-                  WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN
-                    CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                  ELSE
-                    CONVERT_FROM("responseBody", 'UTF8')
-                END,
-                ENCODE("responseBody", 'escape')
-              ),
-              E'[\\n\\r\\t]+', ' ', 'g'
-            ), ${previewLength}::int)
-          )
-        WHEN "requestBody" IS NOT NULL THEN
-          LEFT(REGEXP_REPLACE(
-            COALESCE(
-              CASE
-                WHEN LEFT(CONVERT_FROM("requestBody", 'UTF8'), 1) IN ('{', '[') THEN
-                  CONVERT_FROM("requestBody", 'UTF8')::jsonb::text
-                ELSE
-                  CONVERT_FROM("requestBody", 'UTF8')
-              END,
-              ENCODE("requestBody", 'escape')
-            ),
-            E'[\\n\\r\\t]+', ' ', 'g'
-          ), ${previewLength * 2}::int)
-        WHEN "responseBody" IS NOT NULL THEN
-          CONCAT('→ ', LEFT(REGEXP_REPLACE(
-            COALESCE(
-              CASE
-                WHEN LEFT(CONVERT_FROM("responseBody", 'UTF8'), 1) IN ('{', '[') THEN
-                  CONVERT_FROM("responseBody", 'UTF8')::jsonb::text
-                ELSE
-                  CONVERT_FROM("responseBody", 'UTF8')
-              END,
-              ENCODE("responseBody", 'escape')
-            ),
-            E'[\\n\\r\\t]+', ' ', 'g'
-          ), ${previewLength * 2}::int))
-        ELSE '-'
-      END as preview,
+      preview,
       COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
       COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"
     FROM responses
@@ -122,5 +65,25 @@ export async function select_llm_calls({
     LIMIT ${limit + 1}
   `
 
-  return await query
+  const results = await query
+
+  // Compute price for each result using provider-specific usage parsing
+  return results.map((result) => {
+    let price: number | null = null
+
+    if (result.provider && result.usage && result.pricing && result.responseModel) {
+      const parser = getParserForProvider(result.provider)
+      if (parser) {
+        const standardizedUsage = parser.getUsage(result.usage)
+        if (standardizedUsage) {
+          price = computePriceUsd(result.responseModel, result.pricing, standardizedUsage)
+        }
+      }
+    }
+
+    return {
+      ...result,
+      price,
+    }
+  })
 }

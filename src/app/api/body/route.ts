@@ -4,7 +4,7 @@ import { checkWorkspaceAuth } from '@/lib/auth'
 import { withError } from '@/lib/route-helpers'
 import { requireDefined } from '@/lib/preconditions'
 import { parseSSEEvents } from '@/lib/sse-utils'
-import { getParserForProvider } from '@/lib/format'
+import { ConversationModel, getParserForProvider } from '@/lib/format'
 
 export const GET = withError(async (request: NextRequest) => {
   const { searchParams } = new URL(request.url)
@@ -73,7 +73,7 @@ export const GET = withError(async (request: NextRequest) => {
       rawResponseBody = responseText
       if (provider) {
         // Let provider parse SSE events if possible
-        rawResponseJson = provider.parseSSE(rawResponseJson)
+        rawResponseJson = provider.getJsonFromSSE(rawResponseJson)
       }
     } else {
       // Not SSE, parse as JSON or leave as text
@@ -101,13 +101,24 @@ export const GET = withError(async (request: NextRequest) => {
     status: response.status,
     bodySize: response.responseBody?.length || 0,
   }
+  let conversationNotAvailableReason: string | undefined = undefined;
+  // Create conversation - let errors bubble up to withError handler
+  let conversation: ConversationModel | undefined
+    try {
+      conversation = provider.createConversation(rawRequestBody, rawResponseJson)
+    } catch (error) {
+      console.error('Error creating conversation model:', error)
+      conversationNotAvailableReason = `Error creating conversation model: ${(error as Error).message}`
+    }
+  
 
   return {
     provider: provider?.getParserName(),
     rawResponse,
     rawRequest,
-    conversation: provider?.createConversation(rawRequestBody, rawResponseJson),
+    conversation,
     requestId: response.id,
     public: response.public,
+    conversationNotAvailableReason
   }
 })

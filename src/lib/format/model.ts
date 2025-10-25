@@ -1,6 +1,20 @@
 import type { ModelMessage, Tool } from 'ai'
 import type { SSEEvent } from '@/lib/sse-utils'
 
+/**
+ * Standardized usage metrics across all providers
+ */
+export type Usage = {
+  /** Base input tokens (not cached) */
+  inputTokens: number
+  /** Output/completion tokens generated */
+  outputTokens: number
+  /** Cache read tokens (if supported by provider) */
+  cacheReadTokens?: number
+  /** Cache write/creation tokens (if supported by provider) */
+  cacheWriteTokens?: number
+}
+
 export type ConversationModel = {
   modelMessages: ModelMessage[]
   models: {
@@ -40,7 +54,14 @@ export interface ProviderParser {
    * in non-streaming responses by this provider.
    * @param events
    */
-  parseSSE(events: SSEEvent[]): any
+  getJsonFromSSE(events: SSEEvent[]): any
+
+  /**
+   * Converts provider-specific usage data to standardized Usage format
+   * @param usage Raw usage data from the provider
+   * @returns Standardized usage metrics
+   */
+  getUsage(usage: any): Usage | null
 
   /**
    * Converts a ConversationModel back to the provider's response format

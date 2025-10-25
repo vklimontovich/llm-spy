@@ -14,6 +14,7 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
           queries: {
             staleTime: 60 * 1000, // 1 minute
             refetchOnWindowFocus: false,
+            retry: false,
           },
         },
       })

@@ -1,5 +1,7 @@
 // Minimal pricing loader: returns raw cost per 1K tokens per model.
 
+import { Usage } from '@/lib/format/model'
+
 async function fetchPricingData(): Promise<any> {
   try {
     const response = await fetch('https://models.dev/api.json', {
@@ -58,4 +60,50 @@ export async function getPricing(model: string): Promise<any> {
     LAST_FETCH = now
   }
   return MODEL_CACHE?.[model] ?? null
+}
+
+/**
+ * Computes the total price in USD for an LLM call
+ * @param pricing - Pricing data for the model (from getPricing)
+ * @param usage - Standardized usage data (from parser.getUsage)
+ * @param modelId - Optional model ID for keyed pricing lookups
+ * @returns Total price in USD, or null if pricing unavailable
+ */
+export function computePriceUsd(
+  modelId: string,
+  pricing: any,
+  usage: Usage,
+): number | null {
+
+  const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v)
+  let cost: any = null
+
+  // Handle keyed pricing (multiple models in one pricing object)
+  if (isObj(pricing)) {
+    const keys = Object.keys(pricing)
+    const looksKeyed = keys.some(k => isObj((pricing as any)[k]))
+    if (looksKeyed) {
+      const rec = pricing as Record<string, any>
+      const key = modelId && rec[modelId] ? modelId : keys[0]
+      cost = rec[key]
+    } else {
+      cost = pricing
+    }
+  }
+
+  if (!cost) return null
+
+  const inTokens = usage.inputTokens
+  const outTokens = usage.outputTokens
+  const rdTokens = usage.cacheReadTokens || 0
+  const wrTokens = usage.cacheWriteTokens || 0
+
+  // Calculate total cost (prices are per 1M tokens)
+  const total =
+    (inTokens / 1_000_000) * (Number(cost.input) || 0) +
+    (rdTokens / 1_000_000) * (Number(cost.cache_read) || Number(cost.input) || 0) +
+    (wrTokens / 1_000_000) * (Number(cost.cache_write) || Number(cost.input) || 0) +
+    (outTokens / 1_000_000) * (Number(cost.output) || 0)
+
+  return total
 }

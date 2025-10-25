@@ -5,4 +5,5 @@ export type LlmRequest = {
   rawResponse?: any
   provider?: string
   conversation?: ConversationModel
+  conversationNotAvailableReason?: string
 }

@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Table, Button, Switch, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, User, Bot } from 'lucide-react'
 import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -257,42 +257,6 @@ export default function LlmCallsTable() {
     return read + create
   }
 
-  const computePriceUsd = (
-    pricing: any,
-    usage: any | null | undefined,
-    modelId?: string | null | undefined
-  ) => {
-    if (!pricing || !usage) return null
-    const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v)
-    let cost: any = null
-    if (isObj(pricing)) {
-      const keys = Object.keys(pricing)
-      const looksKeyed = keys.some(k => isObj((pricing as any)[k]))
-      if (looksKeyed) {
-        const rec = pricing as Record<string, any>
-        const key = modelId && rec[modelId] ? modelId : keys[0]
-        cost = rec[key]
-      } else {
-        cost = pricing
-      }
-    }
-    if (!cost) return null
-    const inTokens = Number(usage.input_tokens || 0)
-    const rdTokens = Number(usage.cache_read_input_tokens || 0)
-    const wrTokensFlat = Number(usage.cache_creation_input_tokens || 0)
-    const wrTokensNested =
-      Number(usage.cache_creation?.ephemeral_1h_input_tokens || 0) +
-      Number(usage.cache_creation?.ephemeral_5m_input_tokens || 0)
-    const wrTokens = wrTokensFlat || wrTokensNested
-    const outTokens = Number(usage.output_tokens || 0)
-    const total =
-      (inTokens / 1_000_000) * (Number(cost.input) || 0) +
-      (rdTokens / 1_000_000) * (Number(cost.cache_read) || Number(cost.input) || 0) +
-      (wrTokens / 1_000_000) * (Number(cost.cache_write) || Number(cost.input) || 0) +
-      (outTokens / 1_000_000) * (Number(cost.output) || 0)
-    return total
-  }
-
   const formatDate = (dateString: string) => {
     const date = new Date(dateString)
     const now = new Date()
@@ -424,11 +388,25 @@ export default function LlmCallsTable() {
           params.set('tab', 'chat')
           return `/${workspace.slug}/requests?${params.toString()}`
         })()
-        const lines = preview?.split('\n') || ['-']
+
+        // Handle new object format: { input, output }
+        let inputLine = '-'
+        let outputLine: string | null = null
+
+        if (preview && typeof preview === 'object' && 'input' in preview && 'output' in preview) {
+          inputLine = preview.input || '-'
+          outputLine = preview.output || null
+        } else if (typeof preview === 'string') {
+          // Backward compatibility: old string format
+          const lines = preview.split('\n')
+          inputLine = lines[0] || '-'
+          outputLine = lines[1] || null
+        }
+
         return (
           <a
             href={href}
-            className="block text-xs text-gray-600"
+            className="block text-xs"
             onClick={e => {
               if (e.defaultPrevented) return
               const isPlainLeft = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
@@ -439,8 +417,16 @@ export default function LlmCallsTable() {
               }
             }}
           >
-            {lines[0] && <div className="truncate">{lines[0]}</div>}
-            {lines[1] && <div className="truncate text-gray-500">{lines[1]}</div>}
+            <div className="flex items-start gap-1 truncate text-gray-500">
+              <User className="w-3 h-3 mt-0.5 flex-shrink-0 opacity-40" />
+              <span className="truncate">{inputLine}</span>
+            </div>
+            {outputLine && (
+              <div className="flex items-start gap-1 truncate text-gray-500">
+                <Bot className="w-3 h-3 mt-0.5 flex-shrink-0 opacity-40" />
+                <span className="truncate">{outputLine}</span>
+              </div>
+            )}
           </a>
         )
       },
@@ -492,9 +478,7 @@ export default function LlmCallsTable() {
       fixed: 'right',
       render: (_, record) => (
         <span className="text-xs font-mono">
-          {formatPrice(
-            computePriceUsd(record.pricing, record.usage, record.responseModel)
-          )}
+          {formatPrice(record.price)}
         </span>
       ),
     },
@@ -541,7 +525,7 @@ export default function LlmCallsTable() {
         <div className="flex items-center justify-between mb-2">
           <div>
             <h1 className="text-2xl font-bold">LLM Calls</h1>
-            <p className="text-gray-600">View all captured LLM CallsNow</p>
+            <p className="text-gray-600">View all captured LLM Calls</p>
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">

@@ -100,7 +100,8 @@ export async function decompressResponse(
   }
 }
 
-const AUTH_HEADER = 'x-monitor-auth'
+const AUTH_HEADERS = ['x-monitor-auth', 'x-llmspy-auth']
+export const authGetParams = '__llmspy_auth_key'
 
 export async function validateAuthKey(
   request: NextRequest,
@@ -109,10 +110,13 @@ export async function validateAuthKey(
   if (process.env.DISABLE_AUTHENTICATION === 'true') {
     return
   }
-  const authHeader = request.headers.get(AUTH_HEADER)
+  let authHeader = AUTH_HEADERS.map((header) => request.headers.get(header)).find(h => !!h)
+  if (!authHeader) {
+    authHeader = request.nextUrl.searchParams.get(authGetParams)
+  }
 
   if (!authHeader) {
-    throw new HttpError(401, 'Unauthorized - x-monitor-auth header missing')
+    throw new HttpError(401, 'Unauthorized - auth key is missing')
   }
 
   const authKey = await prisma.authKey.findUnique({
