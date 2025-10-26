@@ -55,8 +55,8 @@ cd llm-spy
 4. Click "Create Credentials" > "OAuth client ID"
 5. Choose "Web application"
 6. Add authorized redirect URIs:
-   - `http://localhost:3000/api/auth/callback/google` (optional, for local testing)
-   - `https://your-domain.com/api/auth/callback/google`
+   - `http://localhost:3441/api/auth/callback/google` (for local testing)
+   - `https://your-domain.com/api/auth/callback/google` (for production)
 7. Save your `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`
 
 ### 3. Initialize Database
@@ -76,8 +76,8 @@ See the [complete list with descriptions](src/lib/server-env.ts) in the source c
 | `DATABASE_URL`         | PostgreSQL connection string                                                                                 | Yes             |
 | `GOOGLE_CLIENT_ID`     | Google OAuth client ID (see step 2)                                                                          | Yes             |
 | `GOOGLE_CLIENT_SECRET` | Google OAuth client secret (see step 2)                                                                      | Yes             |
+| `APP_ORIGIN`           | Your app URL (e.g., `http://localhost:3441` for local, `https://your-domain.com` for production)             | Yes             |
 | `SIGNUP_ENABLED`       | Set to `true` for initial deploy to create your user account                                                 | Yes (initially) |
-| `APP_ORIGIN`           | Your app URL (e.g., `https://your-domain.com`) - optional, used for NextAuth and other purposes              | No              |
 | `NEXTAUTH_SECRET`      | Random secret for NextAuth (e.g., `openssl rand -base64 32`) - optional, if not set will hash Google secrets | No              |
 | `API_ORIGIN`           | Optional API origin if different from app URL                                                                | No              |
 
@@ -128,7 +128,13 @@ See the [Environment Variables](#4-environment-variables) section above for the 
 bun install
 
 # Set up environment variables
-touch .env # Edit .env with your values, see server-env.ts for reference
+cat > .env <<EOF
+DATABASE_URL=postgresql://user:password@host:5432/dbname
+GOOGLE_CLIENT_ID=your-client-id
+GOOGLE_CLIENT_SECRET=your-client-secret
+APP_ORIGIN=http://localhost:3441
+SIGNUP_ENABLED=true
+EOF
 
 # Initialize database
 bun prisma db push

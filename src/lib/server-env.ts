@@ -14,11 +14,11 @@ const serverOnlyEnvSchema = z.object({
   // Google OAuth client secret - get from Google Cloud Console
   GOOGLE_CLIENT_SECRET: z.string().min(1),
 
+  // App origin URL (e.g., http://localhost:3441, https://your-domain.com) - used for NextAuth and other purposes
+  APP_ORIGIN: z.string().url(),
+
   // Optional API origin if different from app URL
   API_ORIGIN: z.string().url().optional(),
-
-  // Optional app origin URL (e.g., https://your-domain.com) - used for NextAuth and other purposes
-  APP_ORIGIN: z.string().url().optional(),
 
   // Optional secret for NextAuth - if not set, will hash Google secrets
   NEXTAUTH_SECRET: z.string().optional(),
