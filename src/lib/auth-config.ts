@@ -3,35 +3,44 @@ import { prisma } from '@/lib/prisma'
 import { hash } from '@/lib/hash'
 import { NextAuthOptions } from 'next-auth'
 import { assertDefined } from '@/lib/preconditions'
+import { serverEnv } from '@/lib/server-env'
+import { isBuildPhase } from '@/lib/build'
 
-console.assert(
-  process.env.GOOGLE_CLIENT_SECRET,
-  'GOOGLE_CLIENT_SECRET must be set in environment variables'
-)
-console.assert(
-  process.env.GOOGLE_CLIENT_ID,
-  'GOOGLE_CLIENT_ID must be set in environment variables'
-)
+// Lazy getter to avoid evaluating serverEnv values during Next.js build phase
+// During build, Next.js analyzes routes which would trigger hash(undefined)
+// since serverEnv bypasses validation when NEXT_PHASE=phase-production-build
+// We return a dummy config during build that satisfies TypeScript but won't be used
+export function getAuthOptions(): NextAuthOptions {
+  // During build phase, return minimal valid config to avoid hash(undefined)
+  if (isBuildPhase()) {
+    return {
+      providers: [],
+      secret: 'build-time-placeholder',
+    }
+  }
 
-export const authOptions: NextAuthOptions = {
-  pages: {
-    signIn: '/signin',
-    error: '/signin/error', // Error code passed in query string as ?error=
-  },
-  providers: [
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID!,
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET!,
-      authorization: {
-        params: {
-          prompt: 'select_account',
+  return {
+    pages: {
+      signIn: '/signin',
+      error: '/signin/error', // Error code passed in query string as ?error=
+    },
+    providers: [
+      GoogleProvider({
+        clientId: serverEnv.GOOGLE_CLIENT_ID,
+        clientSecret: serverEnv.GOOGLE_CLIENT_SECRET,
+        authorization: {
+          params: {
+            prompt: 'select_account',
+          },
         },
-      },
-    }),
-  ],
-  secret:
-    process.env.NEXTAUTH_SECRET || hash(process.env.GOOGLE_CLIENT_SECRET!),
-  callbacks: {
+      }),
+    ],
+    secret: serverEnv.NEXTAUTH_SECRET || hash(serverEnv.GOOGLE_CLIENT_SECRET),
+    // Only trust host headers if no explicit origin is configured
+    // This allows NextAuth to work without NEXTAUTH_URL in dynamic environments
+    ...(!serverEnv.NEXT_PUBLIC_ORIGIN &&
+      !serverEnv.API_ORIGIN && { trustHost: true }),
+    callbacks: {
     async signIn({ user, account }) {
       assertDefined(user.email, 'User email must be defined in signIn callback')
 
@@ -70,8 +79,13 @@ export const authOptions: NextAuthOptions = {
         }
       }
 
-      // If still no user, create new user
+      // If still no user, check if signups are enabled
       if (!existingUser) {
+        if (!serverEnv.SIGNUP_ENABLED) {
+          // Signups are disabled - reject new users
+          return false
+        }
+
         existingUser = await prisma.user.create({
           data: {
             email: user.email,
@@ -99,4 +113,5 @@ export const authOptions: NextAuthOptions = {
       return token
     },
   },
+  }
 }

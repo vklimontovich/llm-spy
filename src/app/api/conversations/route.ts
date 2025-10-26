@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkWorkspaceAuth } from '@/lib/auth'
-import { select_llm_calls } from '@/lib/db_queries'
+import { selectLlmCalls } from '@/lib/db_queries'
 import { Conversation } from '@/types/requests'
 
 export async function GET(request: NextRequest) {
@@ -8,19 +8,22 @@ export async function GET(request: NextRequest) {
     const { workspace } = await checkWorkspaceAuth(request)
 
     // Fetch all LLM calls for the workspace (ordered by conversation)
-    const responses = await select_llm_calls({
+    const responses = await selectLlmCalls({
       workspaceId: workspace.id,
       limit: 10000, // High limit to get all conversations
     })
 
     // Group by conversationId and aggregate
-    const conversationMap = new Map<string, {
-      conversationId: string
-      lastLlmCall: Date
-      totalInputTokens: number
-      totalOutputTokens: number
-      totalPrice: number
-    }>()
+    const conversationMap = new Map<
+      string,
+      {
+        conversationId: string
+        lastLlmCall: Date
+        totalInputTokens: number
+        totalOutputTokens: number
+        totalPrice: number
+      }
+    >()
 
     for (const response of responses) {
       const conversationId = response.conversationId
@@ -33,8 +36,10 @@ export async function GET(request: NextRequest) {
       let inputTokens = 0
       let outputTokens = 0
       if (response.usage) {
-        inputTokens = response.usage.prompt_tokens || response.usage.input_tokens || 0
-        outputTokens = response.usage.completion_tokens || response.usage.output_tokens || 0
+        inputTokens =
+          response.usage.prompt_tokens || response.usage.input_tokens || 0
+        outputTokens =
+          response.usage.completion_tokens || response.usage.output_tokens || 0
       }
 
       // Extract pricing information
@@ -74,7 +79,10 @@ export async function GET(request: NextRequest) {
         },
         totalPrice: conv.totalPrice,
       }))
-      .sort((a, b) => new Date(b.lastLlmCall).getTime() - new Date(a.lastLlmCall).getTime())
+      .sort(
+        (a, b) =>
+          new Date(b.lastLlmCall).getTime() - new Date(a.lastLlmCall).getTime()
+      )
 
     return NextResponse.json({
       conversations,

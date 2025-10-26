@@ -1,3 +1,5 @@
+'use client'
+
 import { KeyList } from '@/components/KeyList'
 import GettingStarted from '@/components/GettingStarted'
 

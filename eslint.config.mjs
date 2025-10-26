@@ -17,6 +17,21 @@ const eslintConfig = [
   {
     rules: {
       '@typescript-eslint/no-explicit-any': 'off',
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector:
+            'MemberExpression[object.object.name="process"][object.property.name="env"]',
+          message:
+            'Direct access to process.env is not allowed. Use serverEnv from @/lib/server-env or clientEnv from @/lib/client-env instead.',
+        },
+      ],
+    },
+  },
+  {
+    files: ['src/lib/server-env.ts', 'src/lib/client-env.ts', 'src/lib/build.ts'],
+    rules: {
+      'no-restricted-syntax': 'off',
     },
   },
 ]

@@ -2,11 +2,67 @@ import { NextRequest, NextResponse } from 'next/server'
 import { ZodError } from 'zod/v4'
 import { gunzip, inflate, brotliDecompress } from 'zlib'
 import { promisify } from 'util'
+import { headers } from 'next/headers'
 import { prisma } from '@/lib/prisma'
+import { serverEnv } from '@/lib/server-env'
+import { maskSensitiveData } from '@/lib/log-masking'
 
 const gunzipAsync = promisify(gunzip)
 const inflateAsync = promisify(inflate)
 const brotliDecompressAsync = promisify(brotliDecompress)
+
+/**
+ * Gets the origin URL from the current request
+ * Checks in order: NEXT_PUBLIC_ORIGIN env var, request headers, fallback
+ * @returns The origin URL (e.g., "https://example.com" or "http://localhost:3000")
+ */
+export async function getOrigin(): Promise<string> {
+  // First check environment variable
+  const configuredOrigin = serverEnv.NEXT_PUBLIC_ORIGIN || serverEnv.APP_ORIGIN
+  if (configuredOrigin) {
+    const origin = configuredOrigin.trim()
+    return origin.endsWith('/') ? origin.slice(0, -1) : origin
+  }
+
+  try {
+    const headersList = await headers()
+
+    // Check for forwarded headers (common in proxy/load balancer setups)
+    const forwardedProto = headersList.get('x-forwarded-proto')
+    const forwardedHost = headersList.get('x-forwarded-host')
+    const forwardedPort = headersList.get('x-forwarded-port')
+
+    // Determine protocol
+    const protocol =
+      forwardedProto || (serverEnv.NODE_ENV === 'production' ? 'https' : 'http')
+
+    // Determine host
+    const host = forwardedHost || headersList.get('host') || 'localhost:3000'
+
+    // Handle port - only include if it's not a standard port
+    let port = ''
+    if (forwardedPort && !host.includes(':')) {
+      const portNum = parseInt(forwardedPort, 10)
+      // Don't include standard ports (80 for http, 443 for https)
+      if (
+        !(
+          (protocol === 'https' && portNum === 443) ||
+          (protocol === 'http' && portNum === 80)
+        )
+      ) {
+        port = `:${forwardedPort}`
+      }
+    }
+
+    return `${protocol}://${host}${port}`
+  } catch (error) {
+    console.warn(
+      'Could not determine origin from headers, using fallback:',
+      error
+    )
+    return 'http://localhost:3000'
+  }
+}
 
 type RouteHandler = (
   request: NextRequest,
@@ -100,28 +156,52 @@ export async function decompressResponse(
   }
 }
 
-const AUTH_HEADERS = ['x-monitor-auth', 'x-llmspy-auth']
+const AUTH_HEADERS = ['x-monitor-auth', 'x-llmspy-auth', 'x-proxy-auth']
 export const authGetParams = '__llmspy_auth_key'
 
-export async function validateAuthKey(
-  request: NextRequest,
-  workspaceId: string | null
-): Promise<void> {
-  if (process.env.DISABLE_AUTHENTICATION === 'true') {
-    return
-  }
-  let authHeader = AUTH_HEADERS.map((header) => request.headers.get(header)).find(h => !!h)
+/**
+ * Extracts auth key from request headers or query params
+ * Returns the full key string (may include upstream prefix like "upstream.key")
+ */
+export function getAuthKey(request: NextRequest): string | undefined {
+  let authHeader = AUTH_HEADERS.map(header => request.headers.get(header)).find(
+    h => !!h
+  )
   if (!authHeader) {
     authHeader = request.nextUrl.searchParams.get(authGetParams)
   }
+  return authHeader ? authHeader.trim() : undefined
+}
 
-  if (!authHeader) {
+/**
+ * Validates auth key and returns the workspace it belongs to
+ * @param request - The NextRequest object (used if key is not provided)
+ * @param key - Optional auth key to validate (if not provided, extracts from request)
+ * @returns The workspace the auth key belongs to
+ */
+export async function validateAuthKey(
+  request: NextRequest,
+  key?: string | null
+): Promise<{ workspaceId: string }> {
+  if (serverEnv.DISABLE_AUTHENTICATION) {
+    // In development mode without auth, we need a default workspace
+    // This is a fallback and should not be used in production
+    const workspace = await prisma.workspace.findFirst()
+    if (!workspace) {
+      throw new HttpError(500, 'No workspace found in database')
+    }
+    return { workspaceId: workspace.id }
+  }
+
+  const authKeyString = key ?? getAuthKey(request)
+
+  if (!authKeyString) {
     throw new HttpError(401, 'Unauthorized - auth key is missing')
   }
 
   const authKey = await prisma.authKey.findUnique({
     where: {
-      key: authHeader.trim(),
+      key: authKeyString,
       deletedAt: null,
     },
   })
@@ -130,17 +210,14 @@ export async function validateAuthKey(
     throw new HttpError(401, 'Unauthorized: Invalid or missing API key')
   }
 
-  // Check if auth key belongs to the workspace (if workspaceId is provided)
-  if (
-    workspaceId &&
-    authKey.workspaceId &&
-    authKey.workspaceId !== workspaceId
-  ) {
+  if (!authKey.workspaceId) {
     throw new HttpError(
       401,
-      'Unauthorized: API key does not belong to this workspace'
+      'Unauthorized: API key is not associated with a workspace'
     )
   }
+
+  return { workspaceId: authKey.workspaceId }
 }
 
 export function extractHeaders(request: NextRequest): Record<string, string> {
@@ -229,13 +306,14 @@ export async function captureResponseBody(
 
       // Limit response body logging to prevent huge logs
       const responseText = Buffer.from(capturedBody).toString('utf-8')
-      if (responseText.length > 2000) {
+      const maskedResponse = maskSensitiveData(responseText)
+      if (maskedResponse.length > 2000) {
         console.log(
           `Response Body (truncated):\n`,
-          responseText.substring(0, 2000) + '...'
+          maskedResponse.substring(0, 2000) + '...'
         )
       } else {
-        console.log(`Response Body:\n`, responseText)
+        console.log(`Response Body:\n`, maskedResponse)
       }
 
       // Get content encoding and decompress if needed

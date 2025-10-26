@@ -7,12 +7,16 @@ export function middleware(request: NextRequest) {
   // Add no-index headers for share endpoints
   if (
     pathname.startsWith('/share') ||
-    pathname.includes('/api/requests/') && (pathname.includes('/public') || pathname.includes('/share'))
+    (pathname.includes('/api/requests/') &&
+      (pathname.includes('/public') || pathname.includes('/share')))
   ) {
     const response = NextResponse.next()
 
     // Multiple layers of protection against indexing
-    response.headers.set('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet, noimageindex')
+    response.headers.set(
+      'X-Robots-Tag',
+      'noindex, nofollow, noarchive, nosnippet, noimageindex'
+    )
 
     return response
   }

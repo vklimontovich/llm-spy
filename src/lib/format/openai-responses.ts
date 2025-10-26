@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { Tool, ModelMessage } from 'ai'
-import type { ConversationModel, ProviderParser, Usage } from '@/lib/format/model'
+import type {
+  ConversationModel,
+  ProviderParser,
+  Usage,
+} from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
 // ──────────────────────────────────────────────────────────
@@ -131,7 +135,9 @@ export function openaiToModel(
 
   // 2) Process input items
   if (payload.input) {
-    const inputs = Array.isArray(payload.input) ? payload.input : [payload.input]
+    const inputs = Array.isArray(payload.input)
+      ? payload.input
+      : [payload.input]
 
     for (let i = 0; i < inputs.length; i++) {
       const item = inputs[i]
@@ -150,7 +156,8 @@ export function openaiToModel(
       } else if (typeof item === 'object' && item.type === 'function_call') {
         // Standalone function call in input - convert to assistant message with tool call
         const funcCall = item as z.infer<typeof OpenAIFunctionCallPart>
-        const toolCallId = funcCall.id || funcCall.call_id || `tool-${Date.now()}`
+        const toolCallId =
+          funcCall.id || funcCall.call_id || `tool-${Date.now()}`
         toolCallMap.set(toolCallId, funcCall.name)
         out.push({
           role: 'assistant',
@@ -164,7 +171,10 @@ export function openaiToModel(
           ],
           providerOptions: { originalMessageGroup: String(i) },
         } as unknown as ModelMessage)
-      } else if (typeof item === 'object' && item.type === 'function_call_output') {
+      } else if (
+        typeof item === 'object' &&
+        item.type === 'function_call_output'
+      ) {
         // Standalone function call output in input - convert to tool result message
         const funcOutput = item as z.infer<typeof OpenAIFunctionCallOutputPart>
         const toolName = toolCallMap.get(funcOutput.call_id) || 'unknown'
@@ -220,7 +230,10 @@ export function openaiToModel(
               const content =
                 textParts.length === 1
                   ? textParts[0].text
-                  : textParts.map(tp => ({ type: 'text' as const, text: tp.text }))
+                  : textParts.map(tp => ({
+                      type: 'text' as const,
+                      text: tp.text,
+                    }))
 
               out.push({
                 role: 'user',
@@ -246,7 +259,8 @@ export function openaiToModel(
                   text: part.text,
                 })
               } else if (part.type === 'function_call') {
-                const toolCallId = part.id || part.call_id || `tool-${Date.now()}`
+                const toolCallId =
+                  part.id || part.call_id || `tool-${Date.now()}`
                 toolCallMap.set(toolCallId, part.name)
                 assistantContent.push({
                   type: 'tool-call' as const,
@@ -309,7 +323,8 @@ export function openaiToModel(
                   text: part.text || '',
                 })
               } else if (part.type === 'function_call') {
-                const toolCallId = part.id || part.call_id || `tool-${Date.now()}`
+                const toolCallId =
+                  part.id || part.call_id || `tool-${Date.now()}`
                 toolCallMap.set(toolCallId, part.name)
                 assistantContent.push({
                   type: 'tool-call' as const,
@@ -398,11 +413,11 @@ export class OpenAIResponsesParser implements ProviderParser {
     payloadUnknown: unknown | null,
     responseUnknown?: unknown
   ): ConversationModel | undefined {
-      if (payloadUnknown === null && responseUnknown) {
-        // When payload is null, create minimal conversation from response only
-        return this.responseToModel(responseUnknown)
-      }
-      return openaiToModel(payloadUnknown, responseUnknown)
+    if (payloadUnknown === null && responseUnknown) {
+      // When payload is null, create minimal conversation from response only
+      return this.responseToModel(responseUnknown)
+    }
+    return openaiToModel(payloadUnknown, responseUnknown)
   }
 
   private responseToModel(responseUnknown: unknown): ConversationModel {
@@ -439,7 +454,8 @@ export class OpenAIResponsesParser implements ProviderParser {
                   text: part.text || '',
                 })
               } else if (part.type === 'function_call') {
-                const toolCallId = part.id || part.call_id || `tool-${Date.now()}`
+                const toolCallId =
+                  part.id || part.call_id || `tool-${Date.now()}`
                 assistantContent.push({
                   type: 'tool-call' as const,
                   toolCallId,
@@ -514,7 +530,11 @@ export class OpenAIResponsesParser implements ProviderParser {
     if (Array.isArray(lastMessage.content)) {
       for (const part of lastMessage.content) {
         if (part.type === 'text') {
-          content.push({ type: 'output_text', text: part.text, annotations: [] })
+          content.push({
+            type: 'output_text',
+            text: part.text,
+            annotations: [],
+          })
         } else if (part.type === 'tool-call') {
           content.push({
             type: 'function_call',
@@ -596,14 +616,19 @@ export class OpenAIResponsesParser implements ProviderParser {
           if (!outputItems[itemIndex].content) {
             outputItems[itemIndex].content = []
           }
-          const contentIndex = data.content_index ?? outputItems[itemIndex].content.length
+          const contentIndex =
+            data.content_index ?? outputItems[itemIndex].content.length
           outputItems[itemIndex].content[contentIndex] = data.content_part
         }
-      } else if (data?.type === 'response.content_part.done' && data.content_part) {
+      } else if (
+        data?.type === 'response.content_part.done' &&
+        data.content_part
+      ) {
         // Content part completed
         const itemIndex = data.item_index ?? outputItems.length - 1
         if (outputItems[itemIndex]) {
-          const contentIndex = data.content_index ?? outputItems[itemIndex].content.length - 1
+          const contentIndex =
+            data.content_index ?? outputItems[itemIndex].content.length - 1
           outputItems[itemIndex].content[contentIndex] = data.content_part
         }
       } else if (data?.type === 'response.output_text.delta' && data.delta) {
@@ -635,7 +660,9 @@ export class OpenAIResponsesParser implements ProviderParser {
 
     // OpenAI uses both input_tokens/output_tokens (newer) and prompt_tokens/completion_tokens (older)
     const inputTokens = Number(usage.input_tokens || usage.prompt_tokens || 0)
-    const outputTokens = Number(usage.output_tokens || usage.completion_tokens || 0)
+    const outputTokens = Number(
+      usage.output_tokens || usage.completion_tokens || 0
+    )
 
     // OpenAI may have cached tokens in various formats
     const cacheReadTokens = Number(usage.cached_tokens || 0)

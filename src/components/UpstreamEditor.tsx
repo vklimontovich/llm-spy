@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
-import { Button, Select } from 'antd'
+import { Button, Select, Modal } from 'antd'
 import {
   Plus,
   Trash2,
@@ -11,14 +11,14 @@ import {
   X,
   Server,
   Link2,
-  FileJson,
   HelpCircle,
   Settings,
   Loader2,
   AlertCircle,
 } from 'lucide-react'
 import { useWorkspaceApi } from '@/lib/api'
-import ConnectionInstructions from './ConnectionInstructions'
+import { validateUpstreamName } from '@/lib/model/validation'
+import GettingStarted from './GettingStarted'
 
 interface Header {
   name: string
@@ -38,6 +38,7 @@ interface UpstreamData {
   headers: Header[]
   inputFormat: string
   outputFormat: string | null
+  keepAuthHeaders: boolean
   otelUpstreams: OtelCollector[]
 }
 
@@ -180,8 +181,12 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     headers: [],
     inputFormat: 'anthropic',
     outputFormat: null,
+    keepAuthHeaders: false,
     otelUpstreams: [],
   })
+
+  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [nameError, setNameError] = useState<string | undefined>()
 
   const {
     data: upstream,
@@ -233,17 +238,12 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
 
   useEffect(() => {
     if (upstream) {
-      // Map old format values to new provider values
-      const mapInputFormat = (format: string) => {
-        if (format === 'otel') return 'opentelemetry'
-        return format || 'auto'
-      }
-
       setFormData({
         name: upstream.name || '',
         url: upstream.url || '',
-        inputFormat: mapInputFormat(upstream.inputFormat),
+        inputFormat: upstream.inputFormat || 'anthropic',
         outputFormat: upstream.outputFormat || null,
+        keepAuthHeaders: upstream.keepAuthHeaders ?? false,
         headers: Array.isArray(upstream.headers)
           ? upstream.headers.map((h: any) => ({
               name: h.name,
@@ -279,6 +279,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+
+    // Validate upstream name before submitting
+    const validation = validateUpstreamName(formData.name)
+    if (!validation.valid) {
+      setNameError(validation.error)
+      return
+    }
+
     saveMutation.mutate(formData)
   }
 
@@ -302,25 +310,26 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     })
   }
 
-  const addOtelCollector = () => {
-    setFormData({
-      ...formData,
-      otelUpstreams: [...formData.otelUpstreams, { url: '', headers: [] }],
-    })
-  }
+  // OTEL collector management functions - currently unused, reserved for future features
+  // const addOtelCollector = () => {
+  //   setFormData({
+  //     ...formData,
+  //     otelUpstreams: [...formData.otelUpstreams, { url: '', headers: [] }],
+  //   })
+  // }
 
-  const updateOtelCollector = (index: number, collector: OtelCollector) => {
-    const newCollectors = [...formData.otelUpstreams]
-    newCollectors[index] = collector
-    setFormData({ ...formData, otelUpstreams: newCollectors })
-  }
+  // const updateOtelCollector = (index: number, collector: OtelCollector) => {
+  //   const newCollectors = [...formData.otelUpstreams]
+  //   newCollectors[index] = collector
+  //   setFormData({ ...formData, otelUpstreams: newCollectors })
+  // }
 
-  const removeOtelCollector = (index: number) => {
-    setFormData({
-      ...formData,
-      otelUpstreams: formData.otelUpstreams.filter((_, i) => i !== index),
-    })
-  }
+  // const removeOtelCollector = (index: number) => {
+  //   setFormData({
+  //     ...formData,
+  //     otelUpstreams: formData.otelUpstreams.filter((_, i) => i !== index),
+  //   })
+  // }
 
   // Keep URL in sync with selected provider when URL hasn't been customized
   useEffect(() => {
@@ -328,7 +337,8 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     const defaultUrl =
       providerForUrl === 'anthropic'
         ? 'https://api.anthropic.com'
-        : providerForUrl === 'openai-chat' || providerForUrl === 'openai-responses'
+        : providerForUrl === 'openai-chat' ||
+            providerForUrl === 'openai-responses'
           ? 'https://api.openai.com'
           : 'https://api.example.com'
     const knownDefaults = [
@@ -352,12 +362,14 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
       <div className="flex flex-col gap-6">
         {/* Connection Instructions */}
         {!isNew && formData.name && (
-          <div className="mb-6">
-            <ConnectionInstructions
-              workspaceSlug={params.workspace as string}
-              upstreamName={formData.name}
-              compact={false}
-            />
+          <div className="mb-6 flex justify-end">
+            <Button
+              type="primary"
+              size="large"
+              onClick={() => setIsModalOpen(true)}
+            >
+              How to Connect
+            </Button>
           </div>
         )}
 
@@ -372,12 +384,28 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 type="text"
                 required
                 value={formData.name}
-                onChange={e =>
-                  setFormData({ ...formData, name: e.target.value })
-                }
-                placeholder="Production Upstream"
-                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={e => {
+                  const newName = e.target.value
+                  setFormData({ ...formData, name: newName })
+
+                  // Validate on change
+                  const validation = validateUpstreamName(newName)
+                  setNameError(validation.valid ? undefined : validation.error)
+                }}
+                placeholder="production_upstream"
+                className={`w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:border-transparent ${
+                  nameError
+                    ? 'border-red-300 focus:ring-red-500'
+                    : 'border-gray-200 focus:ring-blue-500'
+                }`}
               />
+              {nameError && (
+                <p className="mt-1 text-sm text-red-600">{nameError}</p>
+              )}
+              <p className="mt-1 text-xs text-gray-500">
+                Must start with a letter or underscore, and can only contain
+                letters, numbers, and underscores
+              </p>
             </div>
 
             <div>
@@ -393,8 +421,6 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                   }))
                 }}
                 options={[
-                  { value: 'auto', label: 'Auto-detect' },
-                  { value: 'otel', label: 'Open Telemetry' },
                   { value: 'anthropic', label: 'Anthropic' },
                   { value: 'openai-chat', label: 'OpenAI Chat Completion' },
                   { value: 'openai-responses', label: 'OpenAI Responses' },
@@ -408,235 +434,159 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
 
         {/* LLM Backend Section */}
         <Section title="LLM Backend" icon={Server}>
-          {formData.inputFormat === 'otel' ? (
-            <div className="relative">
-              {/* Overlay message */}
-              <div className="absolute inset-0 bg-white/90 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center">
-                <div className="text-center px-4">
-                  <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                    <AlertCircle className="w-6 h-6 text-orange-600" />
-                  </div>
-                  <p className="text-sm font-medium text-gray-900 mb-1">
-                    Not available for OpenTelemetry
-                  </p>
-                  <p className="text-xs text-gray-600 max-w-sm">
-                    OpenTelemetry data is processed asynchronously and cannot be
-                    forwarded to LLM backends
-                  </p>
-                </div>
-              </div>
-
-              {/* Disabled form fields underneath */}
-              <div className="flex flex-col gap-4 opacity-30 pointer-events-none">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    URL
-                  </label>
-                  <input
-                    type="url"
-                    value={formData.url}
-                    disabled
-                    placeholder="https://api.example.com"
-                    className="w-full px-4 py-2 border border-gray-200 rounded-lg bg-gray-50"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Backend Type
-                  </label>
-                  <Select
-                    value={formData.outputFormat || ''}
-                    disabled
-                    options={[{ value: '', label: 'Same as input' }]}
-                    className="w-full"
-                    size="large"
-                  />
-                  <p className="text-xs text-gray-500 mt-1">
-                    Choose a different backend type to convert between formats
-                  </p>
-                </div>
-              </div>
+          <div className="flex flex-col gap-6">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                URL
+              </label>
+              <input
+                type="url"
+                value={formData.url}
+                onChange={e =>
+                  setFormData({ ...formData, url: e.target.value })
+                }
+                placeholder={
+                  providerForUrl === 'anthropic'
+                    ? 'https://api.anthropic.com'
+                    : providerForUrl === 'openai-chat' ||
+                        providerForUrl === 'openai-responses'
+                      ? 'https://api.openai.com'
+                      : 'https://api.example.com'
+                }
+                className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
             </div>
-          ) : (
-            <div className="flex flex-col gap-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  URL
-                </label>
-                <input
-                  type="url"
-                  value={formData.url}
-                  onChange={e =>
-                    setFormData({ ...formData, url: e.target.value })
-                  }
-                  placeholder={
-                    providerForUrl === 'anthropic'
-                      ? 'https://api.anthropic.com'
-                      : providerForUrl === 'openai-chat' || providerForUrl === 'openai-responses'
-                        ? 'https://api.openai.com'
-                        : 'https://api.example.com'
-                  }
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                />
-              </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Backend Type
-                </label>
-                <Select
-                  value={formData.outputFormat || ''}
-                  onChange={value =>
-                    setFormData({ ...formData, outputFormat: value || null })
+            {/* Headers subsection */}
+            <div className="flex flex-col gap-3 pt-4 border-t border-gray-200">
+              <div className="flex items-center justify-between">
+                <h3 className="text-sm font-medium text-gray-700">Headers</h3>
+              </div>
+              <p className="text-sm text-gray-600 mb-2">
+                Headers will be added to outgoing requests to the LLM backend.
+                You can use this to add or override authentication headers (like
+                API keys), set custom headers, or modify request metadata.
+              </p>
+
+              {formData.headers.length > 0 ? (
+                formData.headers.map((header, index) => (
+                  <HeaderRow
+                    key={index}
+                    header={header}
+                    onChange={h => updateHeader(index, h)}
+                    onRemove={() => removeHeader(index)}
+                  />
+                ))
+              ) : (
+                <p className="text-gray-500 text-sm py-4 text-center bg-gray-50 rounded-lg">
+                  No headers configured
+                </p>
+              )}
+
+              <Button
+                type="dashed"
+                onClick={addHeader}
+                icon={<Plus className="w-4 h-4" />}
+                className="mt-2 w-full"
+              >
+                Add Header
+              </Button>
+            </div>
+          </div>
+        </Section>
+
+        {/* Security Section */}
+        <Section title="Security & Privacy" icon={Settings}>
+          <div className="flex flex-col gap-4">
+            <div className="flex-1">
+              <label className="inline-flex items-center gap-3 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={formData.keepAuthHeaders}
+                  onChange={e =>
+                    setFormData({
+                      ...formData,
+                      keepAuthHeaders: e.target.checked,
+                    })
                   }
-                  options={[
-                    { value: '', label: 'Same as input' },
-                    { value: 'anthropic', label: 'Anthropic' },
-                    { value: 'openai-chat', label: 'OpenAI Chat Completion' },
-                    { value: 'openai-responses', label: 'OpenAI Responses' },
-                  ]}
-                  className="w-full"
-                  size="large"
+                  className="sr-only peer"
                 />
-                <p className="text-xs text-gray-500 mt-1">
-                  Choose a different backend type to convert between formats
+                <div className="relative w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div>
+                  <span className="text-sm font-medium text-gray-900">
+                    Keep Authentication Headers
+                  </span>
+                </div>
+              </label>
+              <div className="mt-2 text-sm text-gray-600">
+                <p className="mb-2">
+                  By default, authentication and security-related headers are
+                  masked before being stored in the database to protect
+                  sensitive credentials.
+                </p>
+                <p className="mb-2">
+                  When <strong>disabled</strong> (recommended), headers like{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
+                    Authorization
+                  </code>
+                  ,{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
+                    X-API-Key
+                  </code>
+                  , and{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
+                    Cookie
+                  </code>{' '}
+                  will be masked as{' '}
+                  <code className="px-1 py-0.5 bg-gray-100 rounded text-xs">
+                    sk-a***MASKED***1234
+                  </code>{' '}
+                  in stored request/response logs.
+                </p>
+                <p>
+                  Enable this option only if you need to store the full
+                  authentication headers for debugging purposes.
                 </p>
               </div>
             </div>
-          )}
-        </Section>
-
-        {/* Headers Section */}
-        <Section title="Headers" icon={FileJson}>
-          <div className="flex flex-col gap-3">
-            {formData.headers.length > 0 ? (
-              formData.headers.map((header, index) => (
-                <HeaderRow
-                  key={index}
-                  header={header}
-                  onChange={h => updateHeader(index, h)}
-                  onRemove={() => removeHeader(index)}
-                />
-              ))
-            ) : (
-              <p className="text-gray-500 text-sm py-4 text-center">
-                No headers configured. Headers can be used to add authentication
-                or modify requests.
-              </p>
-            )}
-
-            <Button
-              type="dashed"
-              onClick={addHeader}
-              icon={<Plus className="w-4 h-4" />}
-              className="mt-2 w-full"
-            >
-              Add Header
-            </Button>
           </div>
         </Section>
 
         {/* OpenTelemetry Collectors Section */}
         <Section title="OpenTelemetry Collectors" icon={Link2}>
-          <div className="flex flex-col gap-4">
-            {formData.otelUpstreams.length > 0 ? (
-              formData.otelUpstreams.map((collector, collectorIndex) => (
-                <div
-                  key={collectorIndex}
-                  className="p-4 bg-gray-50 rounded-lg border border-gray-200"
-                >
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-medium text-gray-900">
-                      Collector {collectorIndex + 1}
-                    </h3>
-                    <Button
-                      type="text"
-                      danger
-                      onClick={() => removeOtelCollector(collectorIndex)}
-                      icon={<Trash2 className="w-4 h-4" />}
-                    />
-                  </div>
-
-                  <div className="flex flex-col gap-3">
-                    <input
-                      type="url"
-                      required
-                      value={collector.url}
-                      onChange={e =>
-                        updateOtelCollector(collectorIndex, {
-                          ...collector,
-                          url: e.target.value,
-                        })
-                      }
-                      placeholder="https://otel-collector.example.com:4318"
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-
-                    <div className="flex flex-col gap-2">
-                      <label className="text-sm font-medium text-gray-700">
-                        Headers
-                      </label>
-                      {collector.headers.map((header, headerIndex) => (
-                        <HeaderRow
-                          key={headerIndex}
-                          header={header}
-                          onChange={h => {
-                            const newHeaders = [...collector.headers]
-                            newHeaders[headerIndex] = h
-                            updateOtelCollector(collectorIndex, {
-                              ...collector,
-                              headers: newHeaders,
-                            })
-                          }}
-                          onRemove={() => {
-                            const newHeaders = collector.headers.filter(
-                              (_, i) => i !== headerIndex
-                            )
-                            updateOtelCollector(collectorIndex, {
-                              ...collector,
-                              headers: newHeaders,
-                            })
-                          }}
-                          showOverride={false}
-                        />
-                      ))}
-
-                      <Button
-                        size="small"
-                        onClick={() => {
-                          const newHeaders = [
-                            ...collector.headers,
-                            { name: '', value: '', override: false },
-                          ]
-                          updateOtelCollector(collectorIndex, {
-                            ...collector,
-                            headers: newHeaders,
-                          })
-                        }}
-                        icon={<Plus className="w-3 h-3" />}
-                      >
-                        Add Header
-                      </Button>
-                    </div>
-                  </div>
+          <div className="relative min-h-[240px]">
+            {/* Overlay message */}
+            <div className="absolute inset-0 bg-white/95 backdrop-blur-sm rounded-lg z-10 flex items-center justify-center p-4">
+              <div className="text-center px-4 py-8 max-w-2xl">
+                <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <AlertCircle className="w-8 h-8 text-blue-600" />
                 </div>
-              ))
-            ) : (
-              <p className="text-gray-500 text-sm py-4 text-center">
-                No OpenTelemetry collectors configured. Add collectors to send
-                telemetry data.
-              </p>
-            )}
+                <p className="text-lg font-semibold text-gray-900 mb-3">
+                  Coming Soon
+                </p>
+                <p className="text-sm text-gray-600 leading-relaxed">
+                  LLM request and response payloads will be automatically
+                  transformed into OpenTelemetry spans with AI semantic
+                  conventions and forwarded to configured collectors for
+                  observability and tracing.
+                </p>
+              </div>
+            </div>
 
-            <Button
-              type="dashed"
-              onClick={addOtelCollector}
-              icon={<Plus className="w-4 h-4" />}
-              className="w-full"
-            >
-              Add OpenTelemetry Collector
-            </Button>
+            {/* Disabled form fields underneath */}
+            <div className="flex flex-col gap-4 opacity-20 pointer-events-none">
+              <p className="text-gray-500 text-sm py-4 text-center">
+                No OpenTelemetry collectors configured.
+              </p>
+              <Button
+                type="dashed"
+                disabled
+                icon={<Plus className="w-4 h-4" />}
+                className="w-full"
+              >
+                Add OpenTelemetry Collector
+              </Button>
+            </div>
           </div>
         </Section>
 
@@ -661,6 +611,18 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
           </Button>
         </div>
       </div>
+
+      {/* How to Connect Modal */}
+      <Modal
+        title="How to Connect"
+        open={isModalOpen}
+        onCancel={() => setIsModalOpen(false)}
+        footer={null}
+        width={900}
+        centered
+      >
+        <GettingStarted fixedUpstreamId={id} isModal={true} />
+      </Modal>
     </form>
   )
 }

@@ -1,11 +1,14 @@
+import { serverEnv } from '@/lib/server-env'
+import { clientEnv } from '@/lib/client-env'
+
 function trimEnd(str: string, char: string): string {
   return str.endsWith(char) ? str.slice(0, -1) : str
 }
 
 export function getCurrentOrigin(path?: string): string {
   // Check for environment variable first (available on client side with NEXT_PUBLIC_ prefix)
-  if (process.env.NEXT_PUBLIC_ORIGIN) {
-    return trimEnd(process.env.NEXT_PUBLIC_ORIGIN, '/') + (path || '')
+  if (clientEnv.NEXT_PUBLIC_ORIGIN) {
+    return trimEnd(clientEnv.NEXT_PUBLIC_ORIGIN, '/') + (path || '')
   }
 
   // Client-side version using window.location
@@ -21,8 +24,8 @@ export function getCurrentOrigin(path?: string): string {
 // Server-side version for API routes and server components
 export async function getOriginFromHeaders(path?: string): Promise<string> {
   // Check for environment variable first
-  if (process.env.NEXT_PUBLIC_ORIGIN) {
-    return trimEnd(process.env.NEXT_PUBLIC_ORIGIN, '/') + (path || '')
+  if (clientEnv.NEXT_PUBLIC_ORIGIN) {
+    return trimEnd(clientEnv.NEXT_PUBLIC_ORIGIN, '/') + (path || '')
   }
 
   try {
@@ -36,8 +39,7 @@ export async function getOriginFromHeaders(path?: string): Promise<string> {
 
     // Determine protocol
     const protocol =
-      forwardedProto ||
-      (process.env.NODE_ENV === 'production' ? 'https' : 'http')
+      forwardedProto || (serverEnv.NODE_ENV === 'production' ? 'https' : 'http')
 
     // Determine host
     const host = forwardedHost || headersList.get('host') || 'localhost:3000'

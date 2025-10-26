@@ -12,16 +12,15 @@ import {
   Space,
   Tag,
 } from 'antd'
-import { Plus, Trash2, Copy, Eye, EyeOff } from 'lucide-react'
+import { Plus, Trash2, Copy } from 'lucide-react'
 import { useWorkspaceApi } from '@/lib/api'
+import KeyDisplay from './KeyDisplay'
+import { KeyModel } from '@/lib/model/keys'
 
 const { Text, Title, Paragraph } = Typography
 
-interface AuthKey {
-  id: string
-  key: string
-  hashed: boolean
-  createdAt: string
+interface AuthKey extends KeyModel {
+  createdAt?: string
 }
 
 export function KeyList() {
@@ -33,7 +32,6 @@ export function KeyList() {
   const [creating, setCreating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
-  const [visibleKeys, setVisibleKeys] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     fetchKeys()
@@ -94,18 +92,6 @@ export function KeyList() {
     message.success('Copied to clipboard', 2)
   }
 
-  const toggleKeyVisibility = (keyId: string) => {
-    setVisibleKeys(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(keyId)) {
-        newSet.delete(keyId)
-      } else {
-        newSet.add(keyId)
-      }
-      return newSet
-    })
-  }
-
   const columns = [
     {
       title: 'ID',
@@ -120,30 +106,10 @@ export function KeyList() {
     },
     {
       title: 'Key',
-      dataIndex: 'key',
-      key: 'key',
-      render: (key: string, record: AuthKey) => (
-        <Space>
-          <Text code className="text-xs">
-            {record.hashed || !visibleKeys.has(record.id)
-              ? '•'.repeat(key.length)
-              : key}
-          </Text>
-          {!record.hashed && (
-            <Button
-              size="small"
-              type="text"
-              icon={
-                visibleKeys.has(record.id) ? (
-                  <EyeOff className="w-3 h-3" />
-                ) : (
-                  <Eye className="w-3 h-3" />
-                )
-              }
-              onClick={() => toggleKeyVisibility(record.id)}
-            />
-          )}
-        </Space>
+      dataIndex: 'hint',
+      key: 'hint',
+      render: (hint: string, record: AuthKey) => (
+        <KeyDisplay hint={hint} keyId={record.id} mode="rich" />
       ),
     },
     {

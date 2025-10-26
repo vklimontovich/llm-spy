@@ -20,8 +20,6 @@ const openaiResponsesParser = new OpenAIResponsesParser()
 
 const parsers: Record<string, ProviderParser> = {
   anthropic: new AnthropicParser(),
-  openai: openaiResponsesParser, // Legacy/auto-detect fallback
-  'openai-chat': openaiResponsesParser, // OpenAI Chat Completion API (not yet implemented, using Responses parser)
   'openai-responses': openaiResponsesParser, // OpenAI Responses API
   // Add more parsers as needed: google, mistral, cohere, meta
 }

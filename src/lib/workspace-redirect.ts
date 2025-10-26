@@ -42,7 +42,7 @@ export async function redirectToWorkspace(session: Session | null) {
       },
     })
 
-    redirect(`/${workspace.slug}/upstreams`)
+    redirect(`/${workspace.slug}/requests`)
   }
 
   if (user.workspaces.length === 0) {
@@ -61,10 +61,10 @@ export async function redirectToWorkspace(session: Session | null) {
       },
     })
 
-    redirect(`/${workspace.slug}/upstreams`)
+    redirect(`/${workspace.slug}/requests`)
   }
 
   // User has workspaces, redirect to the first one
   const firstWorkspace = user.workspaces[0].workspace
-  redirect(`/${firstWorkspace.slug}/upstreams`)
+  redirect(`/${firstWorkspace.slug}/requests`)
 }

@@ -15,11 +15,15 @@ import {
   ArrowDown,
   GitBranch,
   Share2,
+  Plus,
+  Minus,
 } from 'lucide-react'
+import { useState } from 'react'
 import Logo from './Logo'
 import TerminalWindow from './TerminalWindow'
 import ScreenshotGallery from './ScreenshotGallery'
-import { copy, DOMAIN } from '@/lib/copy'
+import GettingStarted from './GettingStarted'
+import { copy, DOMAIN, AUTH_HEADER } from '@/lib/copy'
 
 interface LandingPageProps {
   loggedIn?: boolean
@@ -46,17 +50,26 @@ const FeatureCard = ({
   title,
   description,
   features,
+  badge,
 }: {
   icon: React.ElementType
   title: string
   description: string
   features: string[]
+  badge?: string
 }) => (
   <div className="bg-white rounded-2xl p-8 border border-gray-100 hover:border-purple-200 hover:shadow-xl transition-all duration-200">
     <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center mb-6">
       <Icon className="w-6 h-6 text-white" />
     </div>
-    <h3 className="text-xl font-semibold mb-3">{title}</h3>
+    <div className="flex items-center gap-2 mb-3">
+      <h3 className="text-xl font-semibold">{title}</h3>
+      {badge && (
+        <span className="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs font-medium rounded-full">
+          {badge}
+        </span>
+      )}
+    </div>
     <p className="text-gray-600 mb-4">{description}</p>
     <ul className="space-y-2">
       {features.map((feature, idx) => (
@@ -289,6 +302,130 @@ const SessionIntelligence = () => (
   </Section>
 )
 
+// FAQ Components
+const FaqItem = ({
+  question,
+  answer,
+  link,
+  answerSuffix,
+  links,
+  answerTemplate,
+}: {
+  question: string
+  answer: string
+  link?: { text: string; url: string }
+  answerSuffix?: string
+  links?: { text: string; url: string }[]
+  answerTemplate?: string
+}) => {
+  const [isOpen, setIsOpen] = useState(false)
+
+  const renderAnswer = () => {
+    // Handle multiple links with template
+    if (links && answerTemplate) {
+      const parts = answerTemplate.split(/(\{\d+\})/)
+      return (
+        <p className="text-gray-600 leading-relaxed">
+          {parts.map((part, idx) => {
+            const match = part.match(/\{(\d+)\}/)
+            if (match) {
+              const linkIndex = parseInt(match[1])
+              const linkData = links[linkIndex]
+              return linkData ? (
+                <a
+                  key={idx}
+                  href={linkData.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-purple-600 hover:text-purple-700 underline"
+                >
+                  {linkData.text}
+                </a>
+              ) : null
+            }
+            return <span key={idx}>{part}</span>
+          })}
+        </p>
+      )
+    }
+
+    // Handle single link
+    return (
+      <p className="text-gray-600 leading-relaxed">
+        {answer}
+        {link && (
+          <a
+            href={link.url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-purple-600 hover:text-purple-700 underline"
+          >
+            {link.text}
+          </a>
+        )}
+        {answerSuffix}
+      </p>
+    )
+  }
+
+  return (
+    <div className="border-b border-gray-200 last:border-b-0">
+      <button
+        onClick={() => setIsOpen(!isOpen)}
+        className="w-full py-6 flex items-center justify-between text-left hover:text-purple-600 transition-colors group"
+      >
+        <span className="text-lg font-semibold pr-8">{question}</span>
+        <div className="flex-shrink-0 w-6 h-6 rounded-full bg-purple-100 flex items-center justify-center group-hover:bg-purple-200 transition-colors">
+          {isOpen ? (
+            <Minus className="w-4 h-4 text-purple-600" />
+          ) : (
+            <Plus className="w-4 h-4 text-purple-600" />
+          )}
+        </div>
+      </button>
+      {isOpen && <div className="pb-6 pr-12">{renderAnswer()}</div>}
+    </div>
+  )
+}
+
+const FaqSection = () => (
+  <Section className="bg-white">
+    <div className="text-center mb-16">
+      <h2 className="text-4xl md:text-5xl font-bold mb-4">
+        <span className="bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
+          {copy.faq.title}
+        </span>
+      </h2>
+      <p className="text-xl text-gray-600 max-w-2xl mx-auto">
+        {copy.faq.subtitle}
+      </p>
+    </div>
+
+    <div className="max-w-3xl mx-auto">
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="divide-y divide-gray-200">
+          {copy.faq.questions.map((faq, idx) => (
+            <div key={idx} className="px-8">
+              <FaqItem
+                question={faq.question}
+                answer={faq.answer}
+                link={'link' in faq ? faq.link : undefined}
+                answerSuffix={
+                  'answerSuffix' in faq ? faq.answerSuffix : undefined
+                }
+                links={'links' in faq ? [...(faq.links || [])] : undefined}
+                answerTemplate={
+                  'answerTemplate' in faq ? faq.answerTemplate : undefined
+                }
+              />
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  </Section>
+)
+
 export default function LandingPage({ loggedIn = false }: LandingPageProps) {
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-blue-50/20 to-purple-50/20">
@@ -334,8 +471,10 @@ export default function LandingPage({ loggedIn = false }: LandingPageProps) {
         <div className="mt-20 relative">
           <div className="absolute inset-0 bg-gradient-to-r from-blue-400 to-purple-400 blur-3xl opacity-20"></div>
           <TerminalWindow>
-            <pre>{`$ export ANTHROPIC_BASE_URL=https://${DOMAIN}/workspace-1/anthropic
-$ claude 
+            <pre>{`ANTHROPIC_BASE_URL="https://${DOMAIN}" \\
+ANTHROPIC_CUSTOM_HEADERS="${AUTH_HEADER}: KEY" \\
+claude
+
 > Build me a LangChain agent that teaches me how to cook sushi`}</pre>
           </TerminalWindow>
         </div>
@@ -419,6 +558,34 @@ $ claude
             </div>
           </div>
         </div>
+
+        {/* Interactive Connection Instructions */}
+        <div className="mt-16">
+          <GettingStarted
+            header="Examples"
+            demoMode={true}
+            upstreams={[
+              {
+                id: 'anthropic',
+                name: 'anthropic',
+                url: 'https://api.anthropic.com',
+              },
+              {
+                id: 'openai',
+                name: 'openai',
+                url: 'https://api.openai.com',
+              },
+            ]}
+            keys={[
+              {
+                id: 'demo-key',
+                hint: 'sk_demo_api_key',
+                hashed: false,
+                name: 'sk_demo_api_key',
+              },
+            ]}
+          />
+        </div>
       </Section>
 
       {/* Why Section */}
@@ -452,6 +619,11 @@ $ claude
             title={copy.features.gateway.title}
             description={copy.features.gateway.description}
             features={[...copy.features.gateway.points]}
+            badge={
+              'badge' in copy.features.gateway
+                ? copy.features.gateway.badge
+                : undefined
+            }
           />
         </div>
       </Section>
@@ -534,21 +706,27 @@ $ claude
                 # Your app thinks it&apos;s using Claude...
               </div>
               <div className="mb-2">
-                $ export ANTHROPIC_BASE_URL={DOMAIN}/workspace-1/anthropic
+                ANTHROPIC_BASE_URL=&quot;https://{DOMAIN}&quot; \
               </div>
-              <div className="mb-4">$ claude </div>
+              <div className="mb-2">
+                ANTHROPIC_CUSTOM_HEADERS=&quot;{AUTH_HEADER}: key&quot; \
+              </div>
+              <div className="mb-4">claude</div>
 
               <div className="mb-2 ">
                 {'>'} Build me a LangChain agent that teaches me how to cook
                 sushi
               </div>
               <div className="mb-4 text-gray-500">
-                # Actually, claude talks with ChatGPT
+                # But actually uses GPT-4 via translation gateway
               </div>
             </div>
           </TerminalWindow>
         </div>
       </Section>
+
+      {/* FAQ Section */}
+      <FaqSection />
 
       {/* Pricing Section */}
       <Section className="bg-gradient-to-b from-white to-purple-50/30">

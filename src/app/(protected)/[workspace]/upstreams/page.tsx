@@ -5,6 +5,7 @@ import { Button } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
 import { useRouter, useParams } from 'next/navigation'
 import UpstreamList from '@/components/UpstreamList'
+import GettingStarted from '@/components/GettingStarted'
 import { useWorkspaceApi } from '@/lib/api'
 
 export default function UpstreamsPage() {
@@ -35,8 +36,8 @@ export default function UpstreamsPage() {
   }
 
   return (
-    <div className="p-6">
-      <div className="flex justify-between items-center mb-6">
+    <div className="p-6 space-y-6">
+      <div className="flex justify-between items-center">
         <div>
           <h1 className="text-2xl font-bold">Upstreams</h1>
           <p className="text-gray-600">
@@ -53,6 +54,8 @@ export default function UpstreamsPage() {
       </div>
 
       <UpstreamList upstreams={upstreams || []} isLoading={isLoading} />
+
+      <GettingStarted header="How to Connect" upstreams={upstreams || []} />
     </div>
   )
 }

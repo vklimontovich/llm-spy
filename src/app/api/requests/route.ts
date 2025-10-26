@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { checkWorkspaceAuth } from '@/lib/auth'
-import { select_llm_calls } from '@/lib/db_queries'
+import { selectLlmCalls } from '@/lib/db_queries'
 import { FiltersSchema } from '@/types/requests'
 
 export async function GET(request: NextRequest) {
@@ -40,7 +40,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Use utility function to fetch LLM calls
-    const responses = await select_llm_calls({
+    const responses = await selectLlmCalls({
       workspaceId: workspace.id,
       cursor,
       limit,

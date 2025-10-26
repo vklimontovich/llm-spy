@@ -1,48 +1,106 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { applyUpstreamHeaders, authGetParams, captureResponseBody, decompressResponse, extractHeaders, validateAuthKey } from '@/lib/route-helpers'
-import { detectProviderFromRequest, getParserForProvider } from '@/lib/format'
-import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
-import type { ConversationModel } from '@/lib/format/model'
-import { getPricing } from '@/lib/pricing'
+import {
+  applyUpstreamHeaders,
+  authGetParams,
+  captureResponseBody,
+  decompressResponse,
+  extractHeaders,
+  getAuthKey,
+  HttpError,
+  validateAuthKey,
+} from '@/lib/route-helpers'
 import { extractConversationId } from '@/lib/session-utils'
+import {
+  ConversationModel,
+  detectProviderFromRequest,
+  getParserForProvider,
+} from '@/lib/format'
+import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
+import { getPricing } from '@/lib/pricing'
+import { maskSensitiveData } from '@/lib/log-masking'
 import { getPreview } from '@/lib/preview'
 
-async function handleProxy(
-  request: NextRequest,
-  { params }: { params: Promise<Record<string, string>> }
-) {
+/**
+ * Masks security-sensitive header values for storage and logging.
+ * This helps prevent accidental exposure of API keys, tokens, and other credentials.
+ * Masks any header name containing 'auth' or 'key' (case-insensitive).
+ */
+function maskSecurityValues(
+  headers: Record<string, string>
+): Record<string, string> {
+  const masked: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(headers)) {
+    const lowerKey = key.toLowerCase()
+    // Check if header name contains 'auth' or 'key'
+    if (lowerKey.includes('auth') || lowerKey.includes('key')) {
+      // Mask the value but keep first/last 4 chars if long enough
+      if (value.length > 12) {
+        const prefix = value.substring(0, 4)
+        const suffix = value.substring(value.length - 4)
+        masked[key] = `${prefix}***MASKED***${suffix}`
+      } else {
+        masked[key] = '***MASKED***'
+      }
+    } else {
+      masked[key] = value
+    }
+  }
+
+  return masked
+}
+
+export async function handleProxy(request: NextRequest) {
   const method = request.method.toUpperCase()
   try {
-    const _params = await params
-    const { upstream: upstreamName, workspace } = _params
-
-    // First find the workspace by ID or slug
-    const foundWorkspace = await prisma.workspace.findFirst({
-      where: {
-        OR: [{ id: workspace }, { slug: workspace }],
-      },
-    })
-
-    if (!foundWorkspace) {
-      console.log(
-        `Workspace not found: ${workspace} for method ${method} ${request.url}`
-      )
-      return NextResponse.json(
-        { error: 'Workspace not found' },
-        { status: 404 }
-      )
+    // Step 1: Get auth key (must be present)
+    const fullAuthKey = getAuthKey(request)
+    if (!fullAuthKey) {
+      throw new HttpError(401, 'Unauthorized - auth key is missing')
     }
 
-    // Validate auth key belongs to this workspace
-    await validateAuthKey(request, foundWorkspace.id)
+    // Step 2: Parse key to extract upstream name and actual key
+    let upstreamName: string | undefined
+    let actualKey: string
+    const colonIndex = fullAuthKey.indexOf(':')
 
-    // Find upstream by name or ID within the workspace
+    if (colonIndex !== -1) {
+      // Key format: {upstreamName}:{key}
+      upstreamName = fullAuthKey.substring(0, colonIndex)
+      actualKey = fullAuthKey.substring(colonIndex + 1)
+    } else {
+      // Key doesn't have ':', check for X-Upstream-Id header
+      const upstreamId = request.headers.get('x-upstream-id')
+      if (!upstreamId) {
+        throw new HttpError(
+          400,
+          'Bad Request - either provide X-Upstream-Id header or use auth key in format {upstreamName}:{key}'
+        )
+      }
+      upstreamName = upstreamId
+      actualKey = fullAuthKey
+    }
+
+    // Step 3: Validate auth key and get workspace ID
+    const { workspaceId } = await validateAuthKey(request, actualKey)
+
+    // Step 4: Find upstream by name or ID
     const upstream = await prisma.upstream.findFirst({
       where: {
         OR: [{ name: upstreamName }, { id: upstreamName }],
-        workspaceId: foundWorkspace.id,
+        workspaceId,
         deletedAt: null,
+      },
+      select: {
+        id: true,
+        name: true,
+        url: true,
+        headers: true,
+        inputFormat: true,
+        outputFormat: true,
+        keepAuthHeaders: true,
+        workspaceId: true,
       },
     })
 
@@ -106,10 +164,14 @@ async function handleProxy(
           status: 200,
           requestBody: decompressedRequestBody,
           responseBody: Buffer.from(responseBody),
-          requestHeaders,
-          responseHeaders,
+          requestHeaders: upstream.keepAuthHeaders
+            ? requestHeaders
+            : maskSecurityValues(requestHeaders),
+          responseHeaders: upstream.keepAuthHeaders
+            ? responseHeaders
+            : maskSecurityValues(responseHeaders),
           conversationId,
-          workspaceId: foundWorkspace.id,
+          workspaceId,
         },
       })
 
@@ -128,7 +190,14 @@ async function handleProxy(
     const filteredSearch = filteredSearchParams.toString()
     const searchString = filteredSearch ? `?${filteredSearch}` : ''
 
-    const targetUrl = `${upstream.url}${url.pathname.replace(`/${workspace}/${upstreamName}`, '')}${searchString}`
+    // Use the full pathname from the request, avoiding double slashes
+    const baseUrl = upstream.url.endsWith('/')
+      ? upstream.url.slice(0, -1)
+      : upstream.url
+    const pathname = url.pathname.startsWith('/')
+      ? url.pathname
+      : `/${url.pathname}`
+    const targetUrl = `${baseUrl}${pathname}${searchString}`
     console.log(
       `Proxying ${method.toUpperCase()} ${request.url} -> ${targetUrl}`
     )
@@ -168,13 +237,14 @@ async function handleProxy(
     // Log request body for audit purposes
     if (decompressedRequestBody) {
       const requestText = decompressedRequestBody.toString('utf-8')
-      if (requestText.length > 2000) {
+      const maskedRequest = maskSensitiveData(requestText)
+      if (maskedRequest.length > 2000) {
         console.log(
           `Request Body (truncated):\n`,
-          requestText.substring(0, 2000) + '...'
+          maskedRequest.substring(0, 2000) + '...'
         )
       } else {
-        console.log(`Request Body:\n`, requestText)
+        console.log(`Request Body:\n`, maskedRequest)
       }
     }
 
@@ -213,13 +283,17 @@ async function handleProxy(
               let responseJson: any
               const responseText = decompressedResponseBody.toString('utf-8')
               if (isSSEResponse(responseHeaders)) {
-                responseJson = parser.getJsonFromSSE(parseSSEEvents(responseText))
+                responseJson = parser.getJsonFromSSE(
+                  parseSSEEvents(responseText)
+                )
               } else {
                 try {
                   responseJson = JSON.parse(responseText)
                 } catch {
                   // Fallback: attempt SSE reconstruction if JSON parsing fails
-                  responseJson = parser.getJsonFromSSE(parseSSEEvents(responseText))
+                  responseJson = parser.getJsonFromSSE(
+                    parseSSEEvents(responseText)
+                  )
                 }
               }
 
@@ -231,7 +305,8 @@ async function handleProxy(
                 requestModel = conversationModel.models.request
                 responseModel = conversationModel.models.response
                 // Persist the raw usage block from provider if available
-                usageRaw = (responseJson as any)?.usage ?? conversationModel.usage
+                usageRaw =
+                  (responseJson as any)?.usage ?? conversationModel.usage
 
                 // Calculate pricing lookup; save raw cost node as-is
                 if (responseModel) {
@@ -239,14 +314,20 @@ async function handleProxy(
                   if (pricingData) {
                     console.log(`[pricing] Found cost for ${responseModel}`)
                   } else {
-                    console.warn(`[pricing] No cost found for model ${responseModel}`)
+                    console.warn(
+                      `[pricing] No cost found for model ${responseModel}`
+                    )
                   }
                 }
 
                 // Generate preview from conversation
                 const messages = conversationModel.modelMessages
-                const lastUserMessage = messages.findLast(m => m.role === 'user')
-                const lastAssistantMessage = messages.findLast(m => m.role === 'assistant')
+                const lastUserMessage = messages.findLast(
+                  m => m.role === 'user'
+                )
+                const lastAssistantMessage = messages.findLast(
+                  m => m.role === 'assistant'
+                )
 
                 preview = {
                   input: getPreview(lastUserMessage, 100),
@@ -270,10 +351,14 @@ async function handleProxy(
             status: response.status,
             requestBody: decompressedRequestBody,
             responseBody: decompressedResponseBody,
-            requestHeaders,
-            responseHeaders,
+            requestHeaders: upstream.keepAuthHeaders
+              ? requestHeaders
+              : maskSecurityValues(requestHeaders),
+            responseHeaders: upstream.keepAuthHeaders
+              ? responseHeaders
+              : maskSecurityValues(responseHeaders),
             conversationId,
-            workspaceId: foundWorkspace.id,
+            workspaceId,
             upstreamId: upstream.id,
             provider,
             requestModel,
@@ -320,10 +405,8 @@ async function handleProxy(
   }
 }
 
-export {
-  handleProxy as GET,
-  handleProxy as POST,
-  handleProxy as PUT,
-  handleProxy as DELETE,
-  handleProxy as PATCH,
-}
+export { handleProxy as GET }
+export { handleProxy as POST }
+export { handleProxy as PUT }
+export { handleProxy as DELETE }
+export { handleProxy as PATCH }

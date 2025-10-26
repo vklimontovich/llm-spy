@@ -43,8 +43,13 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
           Chat View is not Available
         </h3>
         <p className="text-gray-500 text-center max-w-md">
-          {llmRequest.conversationNotAvailableReason ||  <>This request does not appear to be an AI conversation. Check the Raw
-          Request and Raw Response tabs for details</>}.
+          {llmRequest.conversationNotAvailableReason || (
+            <>
+              This request does not appear to be an AI conversation. Check the
+              Raw Request and Raw Response tabs for details
+            </>
+          )}
+          .
         </p>
       </div>
     )
@@ -52,7 +57,6 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
 
   const { conversation } = llmRequest
   const collapseItems: any[] = []
-
 
   if (conversation.tools && conversation.tools.length > 0) {
     collapseItems.push({
@@ -95,7 +99,7 @@ const ChatTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
       children: <ChatView messages={conversation.modelMessages} />,
     })
   }
-  
+
   if (conversation.meta) {
     collapseItems.push({
       key: 'meta',
@@ -307,7 +311,11 @@ export default function RequestView({
     tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
 
   // Fetch combined data (request, response, and conversation)
-  const { data: combinedData, isLoading, error } = useQuery({
+  const {
+    data: combinedData,
+    isLoading,
+    error,
+  } = useQuery({
     queryKey: ['body', requestId, 'combined'],
     queryFn: async () => {
       const config = workspaceId

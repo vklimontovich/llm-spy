@@ -8,5 +8,5 @@ export default async function Home({
 }) {
   await requireAuth()
   const { workspace } = await params
-  redirect(`/${workspace}/upstreams`)
+  redirect(`/${workspace}/requests`)
 }

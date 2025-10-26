@@ -11,7 +11,7 @@ export interface LlmCallsSelectParams {
   filters?: Filters
 }
 
-export async function select_llm_calls({
+export async function selectLlmCalls({
   workspaceId,
   cursor,
   limit,
@@ -68,15 +68,24 @@ export async function select_llm_calls({
   const results = await query
 
   // Compute price for each result using provider-specific usage parsing
-  return results.map((result) => {
+  return results.map(result => {
     let price: number | null = null
 
-    if (result.provider && result.usage && result.pricing && result.responseModel) {
+    if (
+      result.provider &&
+      result.usage &&
+      result.pricing &&
+      result.responseModel
+    ) {
       const parser = getParserForProvider(result.provider)
       if (parser) {
         const standardizedUsage = parser.getUsage(result.usage)
         if (standardizedUsage) {
-          price = computePriceUsd(result.responseModel, result.pricing, standardizedUsage)
+          price = computePriceUsd(
+            result.responseModel,
+            result.pricing,
+            standardizedUsage
+          )
         }
       }
     }

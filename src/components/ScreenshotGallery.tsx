@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Image from 'next/image'
 import { ChevronLeft, ChevronRight } from 'lucide-react'
+import { DOMAIN } from '@/lib/copy'
 
 interface Screenshot {
   src: string
@@ -10,8 +11,14 @@ interface Screenshot {
 }
 
 const screenshots: Screenshot[] = [
-  { src: '/landing-screen-1.png', alt: 'Dashboard view showing request monitoring' },
-  { src: '/landing-screen-2.png', alt: 'Detailed request analytics and insights' },
+  {
+    src: '/landing-screen-1.png',
+    alt: 'Dashboard view showing request monitoring',
+  },
+  {
+    src: '/landing-screen-2.png',
+    alt: 'Detailed request analytics and insights',
+  },
 ]
 
 export default function ScreenshotGallery() {
@@ -22,7 +29,7 @@ export default function ScreenshotGallery() {
     if (!isAutoPlaying) return
 
     const interval = setInterval(() => {
-      setCurrentIndex((prev) => (prev + 1) % screenshots.length)
+      setCurrentIndex(prev => (prev + 1) % screenshots.length)
     }, 4000) // Change image every 4 seconds
 
     return () => clearInterval(interval)
@@ -30,12 +37,14 @@ export default function ScreenshotGallery() {
 
   const goToPrevious = () => {
     setIsAutoPlaying(false)
-    setCurrentIndex((prev) => (prev - 1 + screenshots.length) % screenshots.length)
+    setCurrentIndex(
+      prev => (prev - 1 + screenshots.length) % screenshots.length
+    )
   }
 
   const goToNext = () => {
     setIsAutoPlaying(false)
-    setCurrentIndex((prev) => (prev + 1) % screenshots.length)
+    setCurrentIndex(prev => (prev + 1) % screenshots.length)
   }
 
   const goToSlide = (index: number) => {
@@ -69,7 +78,9 @@ export default function ScreenshotGallery() {
                   d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"
                 />
               </svg>
-              <span className="truncate">app.otelproxy.com/workspace-1/requests</span>
+              <span className="truncate">
+                https://{DOMAIN}/workspace-1/requests
+              </span>
             </div>
           </div>
         </div>

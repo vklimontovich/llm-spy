@@ -101,16 +101,15 @@ export const GET = withError(async (request: NextRequest) => {
     status: response.status,
     bodySize: response.responseBody?.length || 0,
   }
-  let conversationNotAvailableReason: string | undefined = undefined;
+  let conversationNotAvailableReason: string | undefined = undefined
   // Create conversation - let errors bubble up to withError handler
   let conversation: ConversationModel | undefined
-    try {
-      conversation = provider.createConversation(rawRequestBody, rawResponseJson)
-    } catch (error) {
-      console.error('Error creating conversation model:', error)
-      conversationNotAvailableReason = `Error creating conversation model: ${(error as Error).message}`
-    }
-  
+  try {
+    conversation = provider.createConversation(rawRequestBody, rawResponseJson)
+  } catch (error) {
+    console.error('Error creating conversation model:', error)
+    conversationNotAvailableReason = `Error creating conversation model: ${(error as Error).message}`
+  }
 
   return {
     provider: provider?.getParserName(),
@@ -119,6 +118,6 @@ export const GET = withError(async (request: NextRequest) => {
     conversation,
     requestId: response.id,
     public: response.public,
-    conversationNotAvailableReason
+    conversationNotAvailableReason,
   }
 })

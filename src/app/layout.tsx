@@ -3,6 +3,12 @@ import { Geist, Geist_Mono } from 'next/font/google'
 import './globals.css'
 import { RootProviders } from '@/lib/providers'
 import { copy, DOMAIN } from '@/lib/copy'
+import { FrontendAppConfigProvider } from '@/lib/frontend-config-provider'
+import { getOrigin } from '@/lib/route-helpers'
+import { serverEnv } from '@/lib/server-env'
+
+// Force all routes to be dynamic since we use headers() extensively
+export const dynamic = 'force-dynamic'
 
 const geistSans = Geist({
   variable: '--font-geist-sans',
@@ -59,11 +65,12 @@ export const viewport: Viewport = {
   initialScale: 1,
 }
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode
 }>) {
+  const origin = await getOrigin()
   return (
     <html lang="en">
       <head>
@@ -71,9 +78,18 @@ export default function RootLayout({
         <link rel="alternate icon" href="/favicon.ico" type="image/x-icon" />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${geistSans.variable} ${geistMono.variable} antialiased overflow-y-scroll`}
       >
-        <RootProviders>{children}</RootProviders>
+        <FrontendAppConfigProvider
+          config={{
+            origin: origin,
+            apiOrigin: serverEnv.API_ORIGIN || origin,
+            isSecure: origin.startsWith('https://'),
+            feedbackEnabled: serverEnv.FEEDBACK_ENABLED,
+          }}
+        >
+          <RootProviders>{children}</RootProviders>
+        </FrontendAppConfigProvider>
       </body>
     </html>
   )

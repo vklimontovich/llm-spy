@@ -31,15 +31,16 @@ export const RequestResponseSchema = LlmCallSchema
 export type RequestResponse = LlmCall
 
 // Filter types
-export const FilterSchema = z.object({
-  field: z.string(),
-  expr: z.enum(['=']).default('='),
-  value: z.string().optional(),
-  values: z.array(z.string()).optional(),
-}).refine(
-  (data) => data.value !== undefined || data.values !== undefined,
-  { message: 'Either value or values must be provided' }
-)
+export const FilterSchema = z
+  .object({
+    field: z.string(),
+    expr: z.enum(['=']).default('='),
+    value: z.string().optional(),
+    values: z.array(z.string()).optional(),
+  })
+  .refine(data => data.value !== undefined || data.values !== undefined, {
+    message: 'Either value or values must be provided',
+  })
 
 export type Filter = z.infer<typeof FilterSchema>
 

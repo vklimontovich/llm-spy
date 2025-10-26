@@ -4,9 +4,10 @@ import { useQuery, useQueryClient } from '@tanstack/react-query'
 import { Table, Button, Switch, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
-import { RefreshCw, User, Bot } from 'lucide-react'
+import { RefreshCw, User, Bot, Database } from 'lucide-react'
 import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
+import GettingStarted from '@/components/GettingStarted'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useWorkspaceApi } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
@@ -28,9 +29,7 @@ function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-700">Filters</span>
-          <span className="text-xs text-gray-500">
-            ({filters.length})
-          </span>
+          <span className="text-xs text-gray-500">({filters.length})</span>
         </div>
         <button
           onClick={onClearAll}
@@ -46,7 +45,9 @@ function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
             className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-gray-300 rounded text-xs"
           >
             <span className="text-gray-600">
-              {filter.field === 'conversationId' ? 'Conversation' : filter.field}
+              {filter.field === 'conversationId'
+                ? 'Conversation'
+                : filter.field}
             </span>
             <span className="text-gray-400">=</span>
             <span className="font-mono text-gray-900">
@@ -67,8 +68,7 @@ function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
 }
 
 export default function LlmCallsTable() {
-  const [selectedRequest, setSelectedRequest] =
-    useState<LlmCall | null>(null)
+  const [selectedRequest, setSelectedRequest] = useState<LlmCall | null>(null)
   const [liveRefresh, setLiveRefresh] = useState(false)
   const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
   const [offset, setOffset] = useState(0)
@@ -120,7 +120,7 @@ export default function LlmCallsTable() {
 
   // Let the error boundary above catch errors
   if (error) {
-    throw error;
+    throw error
   }
 
   // Update last refreshed when data changes
@@ -304,7 +304,12 @@ export default function LlmCallsTable() {
             onClick={e => {
               if (e.defaultPrevented) return
               // Intercept only plain left-clicks; let modified/middle/right clicks pass
-              const isPlainLeft = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+              const isPlainLeft =
+                e.button === 0 &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.shiftKey &&
+                !e.altKey
               if (isPlainLeft) {
                 e.preventDefault()
                 setSelectedRequest(record)
@@ -323,7 +328,7 @@ export default function LlmCallsTable() {
       dataIndex: 'responseModel',
       key: 'responseModel',
       width: 120,
-      render: model => (
+      render: model =>
         !model ? (
           <span className="text-xs text-gray-400">-</span>
         ) : (
@@ -333,8 +338,7 @@ export default function LlmCallsTable() {
           >
             {model}
           </span>
-        )
-      ),
+        ),
     },
     {
       title: <span className="whitespace-nowrap">Status</span>,
@@ -346,7 +350,9 @@ export default function LlmCallsTable() {
         return (
           <span
             className={`px-1.5 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${
-              isSuccess ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
+              isSuccess
+                ? 'bg-green-100 text-green-800'
+                : 'bg-red-100 text-red-800'
             }`}
           >
             {isSuccess ? 'OK' : 'ERR'}
@@ -359,15 +365,20 @@ export default function LlmCallsTable() {
       key: 'conversationId',
       width: 70,
       render: (_, record) => {
-        if (!record.conversationId) return <span className="text-xs text-gray-400">-</span>
+        if (!record.conversationId)
+          return <span className="text-xs text-gray-400">-</span>
         const conversationId = record.conversationId
         return (
           <span
             className="text-xs font-mono text-blue-600 cursor-pointer hover:underline"
             title={conversationId}
-            onClick={(e) => {
+            onClick={e => {
               e.stopPropagation()
-              addFilter({ field: 'conversationId', expr: '=', value: conversationId })
+              addFilter({
+                field: 'conversationId',
+                expr: '=',
+                value: conversationId,
+              })
             }}
           >
             {conversationId}
@@ -393,7 +404,12 @@ export default function LlmCallsTable() {
         let inputLine = '-'
         let outputLine: string | null = null
 
-        if (preview && typeof preview === 'object' && 'input' in preview && 'output' in preview) {
+        if (
+          preview &&
+          typeof preview === 'object' &&
+          'input' in preview &&
+          'output' in preview
+        ) {
           inputLine = preview.input || '-'
           outputLine = preview.output || null
         } else if (typeof preview === 'string') {
@@ -409,7 +425,12 @@ export default function LlmCallsTable() {
             className="block text-xs"
             onClick={e => {
               if (e.defaultPrevented) return
-              const isPlainLeft = e.button === 0 && !e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey
+              const isPlainLeft =
+                e.button === 0 &&
+                !e.metaKey &&
+                !e.ctrlKey &&
+                !e.shiftKey &&
+                !e.altKey
               if (isPlainLeft) {
                 e.preventDefault()
                 setSelectedRequest(record)
@@ -445,8 +466,12 @@ export default function LlmCallsTable() {
         const base = Number(record.usage?.input_tokens || 0)
         const cached = getCachedTokens(record.usage)
         return (
-          <span className="text-xs font-mono" title="Prompt/input token count for this call (base; cached read+create)">
-            {formatNumber(base)}<br />
+          <span
+            className="text-xs font-mono"
+            title="Prompt/input token count for this call (base; cached read+create)"
+          >
+            {formatNumber(base)}
+            <br />
             <span className="whitespace-nowrap text-xs text-gray-500">
               {cached > 0 ? ` (+${formatNumber(cached)} cached)` : ''}
             </span>
@@ -465,7 +490,10 @@ export default function LlmCallsTable() {
       align: 'right',
       fixed: 'right',
       render: (_, record) => (
-        <span className="text-xs font-mono" title="Completion/output token count for this call">
+        <span
+          className="text-xs font-mono"
+          title="Completion/output token count for this call"
+        >
           {formatNumber(getOutputTokens(record.usage))}
         </span>
       ),
@@ -477,9 +505,7 @@ export default function LlmCallsTable() {
       align: 'right',
       fixed: 'right',
       render: (_, record) => (
-        <span className="text-xs font-mono">
-          {formatPrice(record.price)}
-        </span>
+        <span className="text-xs font-mono">{formatPrice(record.price)}</span>
       ),
     },
     {
@@ -529,7 +555,8 @@ export default function LlmCallsTable() {
           </div>
           <div className="flex items-center gap-4">
             <div className="text-sm text-gray-600">
-              {allRequests.length > 0 && `Displaying ${allRequests.length} messages`}
+              {allRequests.length > 0 &&
+                `Displaying ${allRequests.length} messages`}
             </div>
             <Button
               icon={<RefreshCw className="w-4 h-4" />}
@@ -562,9 +589,8 @@ export default function LlmCallsTable() {
           <div />
           {lastRefreshed && (
             <div className="text-xs text-gray-500">
-              Last refreshed at {lastRefreshed.toLocaleTimeString()} ({
-                formatDate(lastRefreshed.toISOString()).ago
-              })
+              Last refreshed at {lastRefreshed.toLocaleTimeString()} (
+              {formatDate(lastRefreshed.toISOString()).ago})
             </div>
           )}
         </div>
@@ -581,11 +607,33 @@ export default function LlmCallsTable() {
             scroll={{ x: true }}
             size="small"
             className={styles.compactTable}
+            locale={{
+              emptyText:
+                !isLoading &&
+                allRequests.length === 0 &&
+                filters.length === 0 ? (
+                  <div className="text-left">
+                    <div className="text-center py-8">
+                      <Database className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                      <div className="text-lg font-medium text-gray-600">
+                        No data to display
+                      </div>
+                    </div>
+                    <GettingStarted header="Get Started - Make Your First API Call" />
+                  </div>
+                ) : (
+                  'No data'
+                ),
+            }}
             // No row-level click; links inside cells handle navigation
           />
           {hasMore && (
             <div className="p-4 text-center border-t">
-              <Button onClick={handleLoadMore} loading={loadingMore || isLoading} size="large">
+              <Button
+                onClick={handleLoadMore}
+                loading={loadingMore || isLoading}
+                size="large"
+              >
                 Load More
               </Button>
             </div>

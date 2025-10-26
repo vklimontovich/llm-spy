@@ -212,7 +212,9 @@ const EmptyState = () => (
       <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-2">
         <Server className="w-8 h-8 text-gray-400" />
       </div>
-      <h3 className="text-lg font-semibold text-gray-900">No upstreams configured</h3>
+      <h3 className="text-lg font-semibold text-gray-900">
+        No upstreams configured
+      </h3>
     </div>
     <div className="max-w-2xl mx-auto w-full">
       <GettingStarted />
@@ -268,7 +270,7 @@ export default function UpstreamList({
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-w-6xl mx-auto">
       {upstreams.map(upstream => (
         <UpstreamCard
           key={upstream.id}

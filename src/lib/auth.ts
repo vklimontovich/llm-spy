@@ -1,11 +1,11 @@
 import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth-config'
+import { getAuthOptions } from '@/lib/auth-config'
 import { prisma } from '@/lib/prisma'
 import { NextRequest } from 'next/server'
 import { requireDefined } from '@/lib/preconditions'
 
 export async function getSession() {
-  return await getServerSession(authOptions)
+  return await getServerSession(getAuthOptions())
 }
 
 export async function requireAuth() {
@@ -74,7 +74,7 @@ export async function requireWorkspaceAccess(
   })
 
   if (!workspace) {
-    throw new Error('Workspace not found or access denied')
+    throw new Error(`Workspace ${workspaceIdOrSlug} not found or access denied`)
   }
 
   return {

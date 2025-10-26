@@ -6,7 +6,10 @@ import type { ModelMessage } from 'ai'
  * @param maxLength Maximum length of the preview (default: 100)
  * @returns A preview string
  */
-export function getPreview(message: ModelMessage | undefined, maxLength: number = 100): string {
+export function getPreview(
+  message: ModelMessage | undefined,
+  maxLength: number = 100
+): string {
   if (!message) {
     return ''
   }
@@ -24,9 +27,10 @@ export function getPreview(message: ModelMessage | undefined, maxLength: number 
       } else if (part.type === 'tool-call') {
         parts.push(`${part.toolName}()`)
       } else if (part.type === 'tool-result') {
-        const resultStr = typeof part.output === 'string'
-          ? part.output
-          : JSON.stringify(part.output)
+        const resultStr =
+          typeof part.output === 'string'
+            ? part.output
+            : JSON.stringify(part.output)
         parts.push(`${part.toolName}→${resultStr}`)
       } else if (part.type === 'image') {
         parts.push('[image]')

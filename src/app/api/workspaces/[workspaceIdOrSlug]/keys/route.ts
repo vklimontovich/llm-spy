@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getSession } from '@/lib/auth'
 import crypto from 'crypto'
+import { toKeyModel } from '@/lib/model/keys'
 
 export async function GET(
   request: NextRequest,
@@ -46,13 +47,8 @@ export async function GET(
       )
     }
 
-    // Return keys - full key for non-hashed, masked for hashed
-    const keys = workspace.authKeys.map(key => ({
-      id: key.id,
-      key: key.hashed ? '(hashed)' : key.key,
-      hashed: key.hashed,
-      createdAt: key.createdAt,
-    }))
+    // Return keys using KeyModel
+    const keys = workspace.authKeys.map(key => toKeyModel(key))
 
     return NextResponse.json(keys)
   } catch (error) {

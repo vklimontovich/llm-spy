@@ -72,9 +72,8 @@ export async function getPricing(model: string): Promise<any> {
 export function computePriceUsd(
   modelId: string,
   pricing: any,
-  usage: Usage,
+  usage: Usage
 ): number | null {
-
   const isObj = (v: any) => v && typeof v === 'object' && !Array.isArray(v)
   let cost: any = null
 
@@ -101,8 +100,10 @@ export function computePriceUsd(
   // Calculate total cost (prices are per 1M tokens)
   const total =
     (inTokens / 1_000_000) * (Number(cost.input) || 0) +
-    (rdTokens / 1_000_000) * (Number(cost.cache_read) || Number(cost.input) || 0) +
-    (wrTokens / 1_000_000) * (Number(cost.cache_write) || Number(cost.input) || 0) +
+    (rdTokens / 1_000_000) *
+      (Number(cost.cache_read) || Number(cost.input) || 0) +
+    (wrTokens / 1_000_000) *
+      (Number(cost.cache_write) || Number(cost.input) || 0) +
     (outTokens / 1_000_000) * (Number(cost.output) || 0)
 
   return total

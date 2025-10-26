@@ -1,6 +1,10 @@
 import { z } from 'zod'
 import type { Tool, ModelMessage } from 'ai'
-import type { ConversationModel, ProviderParser, Usage } from '@/lib/format/model'
+import type {
+  ConversationModel,
+  ProviderParser,
+  Usage,
+} from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
 // ──────────────────────────────────────────────────────────
@@ -71,7 +75,7 @@ export const AnthropicWireSchema = z.object({
               type: z.string(),
             })
             .optional(),
-        }),
+        })
       ),
     ])
     .optional(),
@@ -86,7 +90,7 @@ export type AnthropicWire = z.infer<typeof AnthropicWireSchema>
 
 export function anthropicToModel(
   payloadUnknown: unknown,
-  responseUnknown?: unknown,
+  responseUnknown?: unknown
 ): ConversationModel {
   const payload = AnthropicWireSchema.parse(payloadUnknown)
 
@@ -315,7 +319,7 @@ export function anthropicToModel(
         name: t.name,
         description: t.description,
         inputSchema: t.input_schema || {}, // AI SDK uses 'inputSchema'
-      }) as Tool,
+      }) as Tool
   )
 
   return {
@@ -339,7 +343,7 @@ function normalizeToolResult(raw: unknown): unknown {
       .map(p =>
         p && typeof p === 'object' && (p as any).type === 'text'
           ? String((p as any).text ?? '')
-          : '',
+          : ''
       )
       .filter(Boolean)
       .join('\n')
@@ -358,7 +362,7 @@ export class AnthropicParser implements ProviderParser {
 
   createConversation(
     payloadUnknown: unknown | null,
-    responseUnknown?: unknown,
+    responseUnknown?: unknown
   ): ConversationModel | undefined {
     if (payloadUnknown === null && responseUnknown) {
       // When payload is null, create minimal conversation from response only

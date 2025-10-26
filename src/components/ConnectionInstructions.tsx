@@ -10,14 +10,13 @@ interface ConnectionInstructionsProps {
 
 export default function ConnectionInstructions({
   workspaceSlug,
-  upstreamName,
   compact = false,
 }: ConnectionInstructionsProps) {
   const [expanded, setExpanded] = useState(!compact)
   const endpoint =
     typeof window !== 'undefined'
-      ? `${window.location.origin}/${workspaceSlug}/${upstreamName}`
-      : `https://your-domain.com/${workspaceSlug}/${upstreamName}`
+      ? `${window.location.origin}/`
+      : `https://your-domain.com/`
 
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">

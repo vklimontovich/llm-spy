@@ -1,4 +1,6 @@
 export const DOMAIN = 'llms.klmn.sh'
+export const API_DOMAIN = 'llms.klmn.sh'
+export const AUTH_HEADER = 'x-proxy-auth'
 
 export const copy = {
   // Brand
@@ -39,7 +41,7 @@ export const copy = {
         'Complete visibility into every LLM interaction, tool call, and decision your AI agents make.',
       quickSetup: {
         title: 'Quick Setup',
-        code: `export ANTHROPIC_BASE_URL=https://${DOMAIN}/workspace/anthropic`,
+        code: `ANTHROPIC_BASE_URL="https://${DOMAIN}" \\\nANTHROPIC_CUSTOM_HEADERS="${AUTH_HEADER}: anthropic:YOUR-API-KEY" \\\nclaude`,
         description: "That's it! Your AI is now being monitored.",
       },
     },
@@ -76,11 +78,12 @@ export const copy = {
     gateway: {
       title: 'LLM Translation Gateway',
       shortTitle: 'LLM Translation Gateway',
+      badge: 'Coming Soon',
       description:
         "Use any LLM through any interface. Your app talks to 'Anthropic' but actually uses GPT-4.",
       shortDescription:
         "Route any model through any interface. Use GPT-4 with Anthropic's format or vice versa.",
-      points: ['Format conversion', 'Provider switching', 'Coming soon'],
+      points: ['Format conversion', 'Provider switching'],
     },
   },
 
@@ -176,13 +179,13 @@ export const copy = {
 
   // Pricing Section
   pricing: {
-    badge: 'Limited Time Offer',
-    title: 'Alpha Release Pricing',
+    badge: 'Pricing',
+    title: 'Free to Use',
     price: '$0',
-    subtitle: 'Completely free during alpha',
+    subtitle: 'No cost while hosting is manageable',
     description:
-      "Get full access to all features while we're in alpha. Help us build the best LLM monitoring tool.",
-    cta: 'Start Free Now',
+      "It's free while it doesn't incur significant hosting or storage costs. We may start charging if it becomes an issue, but will keep it affordable.",
+    cta: 'Start Now',
   },
 
   // CTA Section
@@ -204,5 +207,40 @@ export const copy = {
     getStarted: 'Get Started',
     noCardRequired: 'No credit card required',
     freeDuringAlpha: 'Free during alpha',
+  },
+
+  // FAQ Section
+  faq: {
+    title: 'Frequently Asked Questions',
+    subtitle: 'Everything you need to know about LLM SPY',
+    questions: [
+      {
+        question: 'Is LLM SPY a VC-backed or for-profit project?',
+        answer:
+          'No, at least not now. LLM SPY is a hobby project that was built to see the internals of coding agents. The code is fully open source and available on ',
+        link: {
+          text: 'GitHub',
+          url: 'https://github.com/vklimontovich/llm-spy',
+        },
+        answerSuffix: '.',
+      },
+      {
+        question: 'How does LLM SPY affect my API calls?',
+        answer:
+          'LLM SPY acts as a transparent proxy - it logs your requests and responses but adds minimal latency (typically <50ms). Your API calls go directly to the LLM provider exactly as they would without monitoring.',
+      },
+      {
+        question: 'Is LLM SPY secure?',
+        answer: '',
+        links: [
+          { text: 'Neon', url: 'https://neon.tech' },
+          { text: 'Google', url: 'https://cloud.google.com' },
+          { text: 'Vercel', url: 'https://vercel.com' },
+          { text: 'GitHub', url: 'https://github.com/vklimontovich/llm-spy' },
+        ],
+        answerTemplate:
+          'Yes, it is. We use {0} for database, {1} for authentication, and {2} for hosting - all three are well-known, trusted platforms. And the code is available on {3}, so you can see exactly how it works and self-host if you prefer.',
+      },
+    ],
   },
 } as const

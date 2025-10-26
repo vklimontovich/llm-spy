@@ -1,7 +1,10 @@
 import { createHash } from 'crypto'
 
 // Base62 encode from bytes without BigInt (ES2019-compatible)
-function base62Encode(bytes: Uint8Array, alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'): string {
+function base62Encode(
+  bytes: Uint8Array,
+  alphabet = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+): string {
   if (bytes.length === 0) return ''
   const base = 62
   // Count leading zeros
@@ -30,7 +33,8 @@ function base62Encode(bytes: Uint8Array, alphabet = '0123456789ABCDEFGHIJKLMNOPQ
   return out || alphabet[0]
 }
 
-const ALPHABET = '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
+const ALPHABET =
+  '0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz'
 
 // Small LRU-ish cache to avoid re-hashing repeated trace IDs
 
@@ -73,7 +77,7 @@ export function extractConversationId(headers: any): string | null {
  * Groups requests by conversation ID
  */
 export function groupRequestsByConversation<T extends { requestHeaders: any }>(
-  requests: T[],
+  requests: T[]
 ): Map<string | null, T[]> {
   const conversationMap = new Map<string | null, T[]>()
 
