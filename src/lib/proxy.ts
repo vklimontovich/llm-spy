@@ -10,7 +10,6 @@ import {
   HttpError,
   validateAuthKey,
 } from '@/lib/route-helpers'
-import { extractConversationId } from '@/lib/session-utils'
 import { maskSensitiveData } from '@/lib/log-masking'
 import { maskSecurityValues } from '@/lib/security'
 import { postProcessResponse } from '@/lib/request-post-processing'
@@ -120,7 +119,6 @@ export async function handleProxy(request: NextRequest) {
         responseHeaders = { 'content-type': 'text/plain' }
       }
 
-      const conversationId = extractConversationId(requestHeaders)
       await prisma.response.create({
         data: {
           url: request.url,
@@ -134,7 +132,6 @@ export async function handleProxy(request: NextRequest) {
           responseHeaders: upstream.keepAuthHeaders
             ? responseHeaders
             : maskSecurityValues(responseHeaders),
-          conversationId,
           workspaceId,
         },
       })
@@ -229,7 +226,6 @@ export async function handleProxy(request: NextRequest) {
         })
 
         // Store in database with new fields
-        const conversationId = extractConversationId(requestHeaders)
         const saved = await prisma.response.create({
           data: {
             url: targetUrl,
@@ -243,7 +239,8 @@ export async function handleProxy(request: NextRequest) {
             responseHeaders: upstream.keepAuthHeaders
               ? responseHeaders
               : maskSecurityValues(responseHeaders),
-            conversationId,
+            conversationId: postProcessed.conversationId,
+            sessionId: postProcessed.sessionId,
             workspaceId,
             upstreamId: upstream.id,
             provider: postProcessed.provider,

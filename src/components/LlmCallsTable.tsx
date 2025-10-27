@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Table, Button, Tooltip } from 'antd'
+import { Table, Button, Tooltip, Input } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
 import { RefreshCw, User, Bot, Database } from 'lucide-react'
@@ -10,26 +10,32 @@ import RequestDetails from '@/components/RequestDetails'
 import GettingStarted from '@/components/GettingStarted'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { LlmCall, Filter } from '@/schemas/requests'
+import { LlmCall, Filter, Filters } from '@/schemas/requests'
 import { useWorkspaceTrpc } from '@/lib/trpc'
 
 const PAGE_SIZE = 100
 
 interface FilterDisplayProps {
-  filters: Filter[]
+  filters: Filters
   onRemove: (index: number) => void
   onClearAll: () => void
 }
 
 function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
-  if (filters.length === 0) return null
+  const hasFilters =
+    filters.fieldFilters.length > 0 ||
+    (filters.fullText && filters.fullText.length > 0)
+
+  if (!hasFilters) return null
 
   return (
     <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded">
       <div className="flex items-center justify-between mb-2">
         <div className="flex items-center gap-2">
           <span className="text-xs font-medium text-gray-700">Filters</span>
-          <span className="text-xs text-gray-500">({filters.length})</span>
+          <span className="text-xs text-gray-500">
+            ({filters.fieldFilters.length + (filters.fullText ? 1 : 0)})
+          </span>
         </div>
         <button
           onClick={onClearAll}
@@ -39,18 +45,30 @@ function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
         </button>
       </div>
       <div className="flex flex-wrap gap-2">
-        {filters.map((filter, index) => (
+        {filters.fullText && (
+          <div className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-gray-300 rounded text-xs">
+            <span className="text-gray-600">Full Text</span>
+            <span className="text-gray-400">=</span>
+            <span className="font-mono text-gray-900">{filters.fullText}</span>
+            <button
+              onClick={() => onRemove(-1)}
+              className="ml-1 text-gray-400 hover:text-gray-600"
+              title="Remove filter"
+            >
+              ×
+            </button>
+          </div>
+        )}
+        {filters.fieldFilters.map((filter, index) => (
           <div
             key={index}
             className="inline-flex items-center gap-2 px-2 py-1 bg-white border border-gray-300 rounded text-xs"
           >
             <span className="text-gray-600">
-              {filter.field === 'conversationId'
-                ? 'Conversation'
-                : filter.field}
+              {filter.field === 'sessionId' ? 'Session' : filter.field}
             </span>
             <span className="text-gray-400">=</span>
-            <span className="font-mono text-gray-900">
+            <span className="font-mono text-gray-900 whitespace-nowrap">
               {filter.value || filter.values?.join(', ')}
             </span>
             <button
@@ -72,7 +90,8 @@ export default function LlmCallsTable() {
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [allRequests, setAllRequests] = useState<LlmCall[]>([])
-  const [filters, setFilters] = useState<Filter[]>([])
+  const [filters, setFilters] = useState<Filters>({ fieldFilters: [] })
+  const [searchText, setSearchText] = useState('')
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -87,8 +106,14 @@ export default function LlmCallsTable() {
     if (filterParam) {
       try {
         const parsed = JSON.parse(filterParam)
+        // Handle old array format for backward compatibility
         if (Array.isArray(parsed)) {
+          setFilters({ fieldFilters: parsed })
+        } else if (parsed && typeof parsed === 'object') {
           setFilters(parsed)
+          if (parsed.fullText) {
+            setSearchText(parsed.fullText)
+          }
         }
       } catch {
         // Ignore invalid filter params
@@ -103,7 +128,10 @@ export default function LlmCallsTable() {
       trpc.requests.list.query({
         cursor,
         limit: PAGE_SIZE,
-        filter: filters.length > 0 ? filters : undefined,
+        filter:
+          filters.fieldFilters.length > 0 || filters.fullText
+            ? filters
+            : undefined,
       }),
   })
 
@@ -157,9 +185,9 @@ export default function LlmCallsTable() {
     queryClient.invalidateQueries({ queryKey: ['requests'] })
   }
 
-  const updateFiltersInUrl = (newFilters: Filter[]) => {
+  const updateFiltersInUrl = (newFilters: Filters) => {
     const params = new URLSearchParams(searchParams.toString())
-    if (newFilters.length > 0) {
+    if (newFilters.fieldFilters.length > 0 || newFilters.fullText) {
       params.set('filter', JSON.stringify(newFilters))
     } else {
       params.delete('filter')
@@ -172,11 +200,14 @@ export default function LlmCallsTable() {
 
   const addFilter = (filter: Filter) => {
     // Check if filter already exists
-    const exists = filters.some(
+    const exists = filters.fieldFilters.some(
       f => f.field === filter.field && f.value === filter.value
     )
     if (!exists) {
-      const newFilters = [...filters, filter]
+      const newFilters = {
+        ...filters,
+        fieldFilters: [...filters.fieldFilters, filter],
+      }
       setFilters(newFilters)
       setCursor(undefined)
       setHasMore(true)
@@ -186,12 +217,35 @@ export default function LlmCallsTable() {
   }
 
   const removeFilter = (index: number) => {
-    const newFilters = filters.filter((_, i) => i !== index)
+    let newFilters: Filters
+    if (index === -1) {
+      // Remove full text search
+      newFilters = { ...filters, fullText: undefined }
+      setSearchText('')
+    } else {
+      // Remove field filter
+      newFilters = {
+        ...filters,
+        fieldFilters: filters.fieldFilters.filter((_, i) => i !== index),
+      }
+    }
     setFilters(newFilters)
     setCursor(undefined)
     setHasMore(true)
     updateFiltersInUrl(newFilters)
     // The effect will handle updating allRequests when new data arrives
+  }
+
+  const handleSearch = (value: string) => {
+    const trimmedValue = value.trim()
+    const newFilters = {
+      ...filters,
+      fullText: trimmedValue.length > 0 ? trimmedValue : undefined,
+    }
+    setFilters(newFilters)
+    setCursor(undefined)
+    setHasMore(true)
+    updateFiltersInUrl(newFilters)
   }
 
   const handleLoadMore = async () => {
@@ -345,27 +399,27 @@ export default function LlmCallsTable() {
       },
     },
     {
-      title: <span className="whitespace-nowrap">Conversation</span>,
-      key: 'conversationId',
+      title: <span className="whitespace-nowrap">Session</span>,
+      key: 'sessionId',
       width: 70,
       render: (_, record) => {
-        if (!record.conversationId)
+        if (!record.sessionId)
           return <span className="text-xs text-gray-400">-</span>
-        const conversationId = record.conversationId
+        const sessionId = record.sessionId
         return (
           <span
-            className="text-xs font-mono text-blue-600 cursor-pointer hover:underline"
-            title={conversationId}
+            className="text-xs font-mono text-blue-600 cursor-pointer hover:underline whitespace-nowrap"
+            title={sessionId}
             onClick={e => {
               e.stopPropagation()
               addFilter({
-                field: 'conversationId',
+                field: 'sessionId',
                 expr: '=',
-                value: conversationId,
+                value: sessionId,
               })
             }}
           >
-            {conversationId}
+            {sessionId}
           </span>
         )
       },
@@ -538,10 +592,15 @@ export default function LlmCallsTable() {
             <p className="text-gray-600">View all captured LLM Calls</p>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-sm text-gray-600">
-              {allRequests.length > 0 &&
-                `Displaying ${allRequests.length} messages`}
-            </div>
+            <Input.Search
+              placeholder="Search in requests and responses..."
+              allowClear
+              value={searchText}
+              onChange={e => setSearchText(e.target.value)}
+              onSearch={handleSearch}
+              style={{ width: 300 }}
+              size="large"
+            />
             <Button
               icon={<RefreshCw className="w-4 h-4" />}
               onClick={handleRefresh}
@@ -556,10 +615,12 @@ export default function LlmCallsTable() {
           filters={filters}
           onRemove={removeFilter}
           onClearAll={() => {
-            setFilters([])
+            const emptyFilters = { fieldFilters: [], fullText: undefined }
+            setFilters(emptyFilters)
+            setSearchText('')
             setCursor(undefined)
             setHasMore(true)
-            updateFiltersInUrl([])
+            updateFiltersInUrl(emptyFilters)
             // The effect will handle updating allRequests when new data arrives
           }}
         />
@@ -584,7 +645,8 @@ export default function LlmCallsTable() {
                 emptyText:
                   !isFetching &&
                   allRequests.length === 0 &&
-                  filters.length === 0 ? (
+                  filters.fieldFilters.length === 0 &&
+                  !filters.fullText ? (
                     <div className="text-left">
                       <div className="text-center py-8">
                         <Database className="w-12 h-12 mx-auto mb-3 text-gray-400" />

@@ -2,6 +2,7 @@ import { detectProviderFromRequest, getParserForProvider } from '@/lib/format'
 import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
 import { getPricing } from '@/lib/pricing'
 import { getPreview } from '@/lib/preview'
+import { extractConversationIdAndSessionId } from '@/lib/session-utils'
 
 export interface PostProcessingInput {
   requestBody: Buffer | null
@@ -15,6 +16,8 @@ export interface PostProcessingResult {
   provider: string | null
   requestModel?: string
   responseModel?: string
+  sessionId?: string
+  conversationId?: string
   usage?: any
   pricing?: any
   preview?: { input: string; output: string }
@@ -42,20 +45,20 @@ export async function postProcessResponse(
   let pricingData: any | undefined
   let preview: { input: string; output: string } | undefined
 
+  let responseJson: any
+  let requestJson: any
   try {
     // Try to detect provider from request if not set
     if (!provider && requestBody) {
       const requestJson = JSON.parse(requestBody.toString('utf-8'))
       provider = detectProviderFromRequest(requestHeaders, requestJson)
     }
-
     // Get parser for the provider
     const parser = getParserForProvider(provider)
     if (parser && requestBody) {
       try {
-        const requestJson = JSON.parse(requestBody.toString('utf-8'))
+        requestJson = JSON.parse(requestBody.toString('utf-8'))
         // Parse response as JSON or reconstruct from SSE when streaming
-        let responseJson: any
         const responseText = responseBody.toString('utf-8')
         if (isSSEResponse(responseHeaders)) {
           responseJson = parser.getJsonFromSSE(parseSSEEvents(responseText))
@@ -107,6 +110,8 @@ export async function postProcessResponse(
   } catch (error) {
     console.warn('Failed to extract model information:', error)
   }
+  const { conversationId, sessionId, userId } =
+    extractConversationIdAndSessionId(requestHeaders, requestJson, responseJson)
 
   return {
     provider,
@@ -114,6 +119,8 @@ export async function postProcessResponse(
     responseModel,
     usage: usageRaw,
     pricing: pricingData,
+    conversationId,
+    sessionId,
     preview,
   }
 }

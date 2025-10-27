@@ -109,6 +109,7 @@ model Response {
   requestHeaders  Json
   responseHeaders Json
   conversationId  String?    @map("conversation_id")
+  sessionId       String?    @map("session_id")
   public          Boolean    @default(false)
   workspaceId     String?    @map("workspace_id")
   workspace       Workspace? @relation(fields: [workspaceId], references: [id])

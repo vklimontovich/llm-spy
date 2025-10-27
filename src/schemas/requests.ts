@@ -11,6 +11,7 @@ export const LlmCallSchema = z.object({
   requestHeaders: z.record(z.any()),
   responseHeaders: z.record(z.any()),
   conversationId: z.string().nullable().optional(),
+  sessionId: z.string().nullable().optional(),
   createdAt: z.string(),
   public: z.boolean().optional(),
   preview: z.string(),
@@ -44,7 +45,10 @@ export const FilterSchema = z
 
 export type Filter = z.infer<typeof FilterSchema>
 
-export const FiltersSchema = z.array(FilterSchema)
+export const FiltersSchema = z.object({
+  fullText: z.string().optional(),
+  fieldFilters: z.array(FilterSchema).default([]),
+})
 
 export type Filters = z.infer<typeof FiltersSchema>
 

@@ -27,7 +27,7 @@ export const requestsRouter = router({
         workspaceId: ctx.workspace.id,
         cursor: input.cursor,
         limit: input.limit + 1,
-        filters: input.filter || [],
+        filters: input.filter || { fieldFilters: [] },
       })
 
       const hasNextPage = responses.length > input.limit

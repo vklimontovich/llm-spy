@@ -37,6 +37,20 @@ const OpenAIFunctionCallOutputPart = z.object({
   output: z.string(),
 })
 
+const OpenAICustomToolCallPart = z.object({
+  type: z.literal('custom_tool_call'),
+  status: z.string().optional(),
+  call_id: z.string(),
+  name: z.string(),
+  input: z.string(), // JSON string or plain text
+})
+
+const OpenAICustomToolCallOutputPart = z.object({
+  type: z.literal('custom_tool_call_output'),
+  call_id: z.string(),
+  output: z.string(),
+})
+
 const OpenAIReasoningPart = z.object({
   type: z.literal('reasoning'),
   id: z.string().optional(),
@@ -57,6 +71,8 @@ const OpenAIContentPart = z.union([
   OpenAIOutputTextPart,
   OpenAIFunctionCallPart,
   OpenAIFunctionCallOutputPart,
+  OpenAICustomToolCallPart,
+  OpenAICustomToolCallOutputPart,
   OpenAIReasoningPart,
   OpenAIUnknownPart,
 ])
@@ -98,6 +114,8 @@ const OpenAIInputItem = z.union([
   OpenAIReasoningItem,
   OpenAIFunctionCallPart,
   OpenAIFunctionCallOutputPart,
+  OpenAICustomToolCallPart,
+  OpenAICustomToolCallOutputPart,
   z.string(), // Simple text input
 ])
 
@@ -213,6 +231,50 @@ export function openaiToModel(
           ],
           providerOptions: { originalMessageGroup: String(i) },
         } as unknown as ModelMessage)
+      } else if (typeof item === 'object' && item.type === 'custom_tool_call') {
+        // Standalone custom tool call in input - convert to assistant message with tool call
+        const customCall = item as z.infer<typeof OpenAICustomToolCallPart>
+        toolCallMap.set(customCall.call_id, customCall.name)
+        let args: any = {}
+        try {
+          args = JSON.parse(customCall.input || '{}')
+        } catch {
+          // If input is not valid JSON, use it as-is
+          args = { input: customCall.input }
+        }
+        out.push({
+          role: 'assistant',
+          content: [
+            {
+              type: 'tool-call' as const,
+              toolCallId: customCall.call_id,
+              toolName: customCall.name,
+              args,
+            },
+          ],
+          providerOptions: { originalMessageGroup: String(i) },
+        } as unknown as ModelMessage)
+      } else if (
+        typeof item === 'object' &&
+        item.type === 'custom_tool_call_output'
+      ) {
+        // Standalone custom tool call output in input - convert to tool result message
+        const customOutput = item as z.infer<
+          typeof OpenAICustomToolCallOutputPart
+        >
+        const toolName = toolCallMap.get(customOutput.call_id) || 'unknown'
+        out.push({
+          role: 'tool',
+          content: [
+            {
+              type: 'tool-result' as const,
+              toolCallId: customOutput.call_id,
+              toolName,
+              result: customOutput.output,
+            },
+          ],
+          providerOptions: { originalMessageGroup: String(i) },
+        } as unknown as ModelMessage)
       } else if (typeof item === 'object' && item.type === 'message') {
         const msg = item as z.infer<typeof OpenAIMessage>
 
@@ -291,6 +353,23 @@ export function openaiToModel(
                   toolName: part.name,
                   args: JSON.parse(part.arguments),
                 })
+              } else if (part.type === 'custom_tool_call') {
+                const customPart = part as z.infer<
+                  typeof OpenAICustomToolCallPart
+                >
+                toolCallMap.set(customPart.call_id, customPart.name)
+                let args: any = {}
+                try {
+                  args = JSON.parse(customPart.input || '{}')
+                } catch {
+                  args = { input: customPart.input }
+                }
+                assistantContent.push({
+                  type: 'tool-call' as const,
+                  toolCallId: customPart.call_id,
+                  toolName: customPart.name,
+                  args,
+                })
               } else if (part.type === 'reasoning') {
                 const reasoningText = part.content || '[Reasoning (encrypted)]'
                 assistantContent.push({
@@ -355,6 +434,21 @@ export function openaiToModel(
                   toolName: part.name,
                   args: JSON.parse(part.arguments || '{}'),
                 })
+              } else if (part.type === 'custom_tool_call') {
+                const toolCallId = part.call_id || `tool-${Date.now()}`
+                toolCallMap.set(toolCallId, part.name)
+                let args: any = {}
+                try {
+                  args = JSON.parse(part.input || '{}')
+                } catch {
+                  args = { input: part.input }
+                }
+                assistantContent.push({
+                  type: 'tool-call' as const,
+                  toolCallId,
+                  toolName: part.name,
+                  args,
+                })
               } else if (part.type === 'reasoning') {
                 const reasoningText = part.content || '[Reasoning (encrypted)]'
                 assistantContent.push({
@@ -380,6 +474,22 @@ export function openaiToModel(
             toolCallId,
             toolName: item.name,
             args: JSON.parse(item.arguments || '{}'),
+          })
+        } else if (item.type === 'custom_tool_call') {
+          // Direct custom tool call item (not wrapped in message)
+          const toolCallId = item.call_id || `tool-${Date.now()}`
+          toolCallMap.set(toolCallId, item.name)
+          let args: any = {}
+          try {
+            args = JSON.parse(item.input || '{}')
+          } catch {
+            args = { input: item.input }
+          }
+          assistantContent.push({
+            type: 'tool-call' as const,
+            toolCallId,
+            toolName: item.name,
+            args,
           })
         }
       }
@@ -484,6 +594,20 @@ export class OpenAIResponsesParser implements ProviderParser {
                   toolCallId,
                   toolName: part.name,
                   args: JSON.parse(part.arguments || '{}'),
+                })
+              } else if (part.type === 'custom_tool_call') {
+                const toolCallId = part.call_id || `tool-${Date.now()}`
+                let args: any = {}
+                try {
+                  args = JSON.parse(part.input || '{}')
+                } catch {
+                  args = { input: part.input }
+                }
+                assistantContent.push({
+                  type: 'tool-call' as const,
+                  toolCallId,
+                  toolName: part.name,
+                  args,
                 })
               } else if (part.type === 'reasoning') {
                 const reasoningText = part.content || '[Reasoning (encrypted)]'

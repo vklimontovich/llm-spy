@@ -15,7 +15,7 @@ export async function selectLlmCalls({
   workspaceId,
   cursor,
   limit,
-  filters = [],
+  filters = { fieldFilters: [] },
 }: LlmCallsSelectParams): Promise<LlmCall[]> {
   // Build WHERE clause for filters
   let whereClause = Prisma.sql`workspace_id = ${workspaceId}`
@@ -24,8 +24,8 @@ export async function selectLlmCalls({
     whereClause = Prisma.sql`${whereClause} AND "createdAt" < (SELECT "createdAt" FROM responses WHERE id = ${cursor})`
   }
 
-  // Apply filters
-  for (const filter of filters) {
+  // Apply field filters
+  for (const filter of filters.fieldFilters || []) {
     const { field, expr, value, values } = filter
 
     if (expr === '=') {
@@ -35,9 +35,24 @@ export async function selectLlmCalls({
         } else if (values && values.length > 0) {
           whereClause = Prisma.sql`${whereClause} AND conversation_id = ANY(${values})`
         }
+      } else if (field === 'sessionId') {
+        if (value) {
+          whereClause = Prisma.sql`${whereClause} AND session_id = ${value}`
+        } else if (values && values.length > 0) {
+          whereClause = Prisma.sql`${whereClause} AND session_id = ANY(${values})`
+        }
       }
       // Add more field support here as needed
     }
+  }
+
+  // Apply full text search filter
+  if (filters.fullText && filters.fullText.trim().length > 0) {
+    const searchTerm = `%${filters.fullText}%`
+    whereClause = Prisma.sql`${whereClause} AND (
+      encode("requestBody", 'escape') ILIKE ${searchTerm} OR
+      encode("requestBody", 'escape') ILIKE ${searchTerm}
+    )`
   }
 
   const query = prisma.$queryRaw<any[]>`
@@ -56,6 +71,7 @@ export async function selectLlmCalls({
       pricing,
       duration_ms as "durationMs",
       conversation_id as "conversationId",
+      session_id as "sessionId",
       preview,
       COALESCE(OCTET_LENGTH("requestBody"), 0) as "requestBodySize",
       COALESCE(OCTET_LENGTH("responseBody"), 0) as "responseBodySize"

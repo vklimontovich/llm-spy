@@ -50,8 +50,34 @@ function hash(str: string) {
  * Extracts conversation ID from request headers
  * Currently uses sentry-trace header, but can be easily modified to use other headers
  */
-export function extractConversationId(headers: any): string | null {
-  if (!headers || typeof headers !== 'object') return null
+export function extractConversationIdAndSessionId(
+  headers: any,
+  requestJson: any,
+  responseJson
+): {
+  conversationId?: string
+  sessionId?: string
+  userId?: string
+  accountId?: string
+} {
+  if (!headers || typeof headers !== 'object') return {}
+
+  // Special handling for Anthropic metadata
+  // Format: user_{userId}_account_{accountId}_session_{sessionId}
+  const metadata = requestJson?.metadata
+  if (metadata && typeof metadata === 'object' && metadata.user_id) {
+    const userIdStr = metadata.user_id
+    const anthropicPattern = /^user_([^_]+)_account_([^_]+)_session_(.+)$/
+    const match = userIdStr.match(anthropicPattern)
+    if (match) {
+      return {
+        userId: match[1],
+        accountId: match[2],
+        sessionId: match[3],
+        conversationId: undefined,
+      }
+    }
+  }
 
   // Extract from sentry-trace header
   // Format: {trace_id}-{parent_span_id}-{sampled}
@@ -60,7 +86,9 @@ export function extractConversationId(headers: any): string | null {
     // Use the trace_id part as conversation ID
     const parts = sentryTrace.split('-')
     if (parts.length > 0 && parts[0]) {
-      return hash(parts[0])
+      return {
+        sessionId: hash(parts[0]),
+      }
     }
   }
 
@@ -70,23 +98,5 @@ export function extractConversationId(headers: any): string | null {
   // - X-Correlation-ID
   // - X-Conversation-ID
 
-  return null
-}
-
-/**
- * Groups requests by conversation ID
- */
-export function groupRequestsByConversation<T extends { requestHeaders: any }>(
-  requests: T[]
-): Map<string | null, T[]> {
-  const conversationMap = new Map<string | null, T[]>()
-
-  for (const request of requests) {
-    const conversationId = extractConversationId(request.requestHeaders)
-    const existing = conversationMap.get(conversationId) || []
-    existing.push(request)
-    conversationMap.set(conversationId, existing)
-  }
-
-  return conversationMap
+  return {}
 }
