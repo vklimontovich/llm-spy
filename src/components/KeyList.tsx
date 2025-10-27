@@ -1,88 +1,89 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useParams } from 'next/navigation'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   Button,
   Table,
   Modal,
   message,
+  notification,
   Typography,
   Alert,
   Space,
   Tag,
+  App,
 } from 'antd'
-import { Plus, Trash2, Copy } from 'lucide-react'
-import { useWorkspaceApi } from '@/lib/api'
+import { Plus, Trash2, Copy, Check } from 'lucide-react'
 import KeyDisplay from './KeyDisplay'
-import { KeyModel } from '@/lib/model/keys'
+import type { Key } from '@/schemas/keys'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 
 const { Text, Title, Paragraph } = Typography
-
-interface AuthKey extends KeyModel {
-  createdAt?: string
-}
 
 export function KeyList() {
   const params = useParams()
   const workspace = params.workspace as string
-  const api = useWorkspaceApi()
-  const [keys, setKeys] = useState<AuthKey[]>([])
-  const [loading, setLoading] = useState(true)
-  const [creating, setCreating] = useState(false)
   const [newKey, setNewKey] = useState<string | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const trpc = useWorkspaceTrpc()
+  const queryClient = useQueryClient()
+  const { modal } = App.useApp()
 
-  useEffect(() => {
-    fetchKeys()
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [workspace])
+  const { data: keys = [], isLoading: loading } = useQuery({
+    queryKey: ['keys', workspace],
+    queryFn: () => trpc.keys.list.query({ workspaceIdOrSlug: workspace }),
+  })
 
-  const fetchKeys = async () => {
-    try {
-      const { data } = await api.get(`/workspaces/${workspace}/keys`)
-      setKeys(data)
-    } catch (error: any) {
-      console.error('Error fetching keys:', error)
-      message.error(error.response?.data?.error || 'Failed to fetch API keys')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  const createKey = async () => {
-    setCreating(true)
-    try {
-      const { data } = await api.post(`/workspaces/${workspace}/keys`, {})
+  const createMutation = useMutation({
+    mutationFn: () => trpc.keys.create.mutate({ workspaceIdOrSlug: workspace }),
+    onSuccess: data => {
       setNewKey(data.key)
-      await fetchKeys()
       message.success('API key created successfully')
-    } catch (error: any) {
+      queryClient.invalidateQueries({ queryKey: ['keys', workspace] })
+    },
+    onError: (error: Error) => {
       console.error('Error creating key:', error)
-      message.error(error.response?.data?.error || 'Failed to create API key')
-    } finally {
-      setCreating(false)
-    }
+      notification.error({
+        message: 'Failed to create API key',
+        description:
+          error.message || 'An error occurred while creating API key',
+      })
+    },
+  })
+
+  const deleteMutation = useMutation({
+    mutationFn: (keyId: string) =>
+      trpc.keys.delete.mutate({ workspaceIdOrSlug: workspace, keyId }),
+    onSuccess: () => {
+      message.success('API key deleted successfully')
+      queryClient.invalidateQueries({ queryKey: ['keys', workspace] })
+    },
+    onError: (error: Error) => {
+      console.error('Error deleting key:', error)
+      notification.error({
+        message: 'Failed to delete API key',
+        description:
+          error.message || 'An error occurred while deleting API key',
+      })
+    },
+  })
+
+  const createKey = () => {
+    createMutation.mutate()
   }
 
-  const deleteKey = async (keyId: string) => {
-    Modal.confirm({
+  const deleteKey = (keyId: string) => {
+    modal.confirm({
       title: 'Delete API Key',
       content:
         'Are you sure you want to delete this API key? This action cannot be undone.',
       okText: 'Delete',
       okType: 'danger',
-      onOk: async () => {
-        try {
-          await api.delete(`/workspaces/${workspace}/keys/${keyId}`)
-          await fetchKeys()
-          message.success('API key deleted successfully')
-        } catch (error: any) {
-          console.error('Error deleting key:', error)
-          message.error(
-            error.response?.data?.error || 'Failed to delete API key'
-          )
-        }
+      onOk: () => {
+        deleteMutation.mutate(keyId)
       },
     })
   }
@@ -90,6 +91,8 @@ export function KeyList() {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text)
     message.success('Copied to clipboard', 2)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 2000)
   }
 
   const columns = [
@@ -108,7 +111,7 @@ export function KeyList() {
       title: 'Key',
       dataIndex: 'hint',
       key: 'hint',
-      render: (hint: string, record: AuthKey) => (
+      render: (hint: string, record: Key) => (
         <KeyDisplay hint={hint} keyId={record.id} mode="rich" />
       ),
     },
@@ -124,19 +127,13 @@ export function KeyList() {
       ),
     },
     {
-      title: 'Created',
-      dataIndex: 'createdAt',
-      key: 'createdAt',
-      width: 150,
-      render: (date: string) => new Date(date).toLocaleDateString(),
-    },
-    {
       title: 'Actions',
       key: 'actions',
       width: 100,
       align: 'right' as const,
-      render: (_: any, record: AuthKey) => (
+      render: (_: any, record: Key) => (
         <Button
+          type="text"
           size="small"
           danger
           icon={<Trash2 className="w-4 h-4" />}
@@ -183,6 +180,7 @@ export function KeyList() {
         onCancel={() => {
           setModalOpen(false)
           setNewKey(null)
+          setCopied(false)
         }}
         footer={
           newKey
@@ -193,6 +191,7 @@ export function KeyList() {
                   onClick={() => {
                     setModalOpen(false)
                     setNewKey(null)
+                    setCopied(false)
                   }}
                 >
                   Done
@@ -205,7 +204,7 @@ export function KeyList() {
                 <Button
                   key="create"
                   type="primary"
-                  loading={creating}
+                  loading={createMutation.isPending}
                   onClick={createKey}
                 >
                   Create Key
@@ -230,7 +229,13 @@ export function KeyList() {
                 </Text>
                 <Button
                   size="small"
-                  icon={<Copy className="w-4 h-4" />}
+                  icon={
+                    copied ? (
+                      <Check className="w-4 h-4" />
+                    ) : (
+                      <Copy className="w-4 h-4" />
+                    )
+                  }
                   onClick={() => copyToClipboard(newKey)}
                   style={{ border: 'none', boxShadow: 'none' }}
                 />

@@ -1,15 +1,15 @@
-import { NextRequest, NextResponse } from 'next/server'
-import { checkWorkspaceAuth } from '@/lib/auth'
+import { router, workspaceProcedure } from '../trpc'
 import { selectLlmCalls } from '@/lib/db_queries'
-import { Conversation } from '@/types/requests'
+import { Conversation } from '@/schemas/requests'
 
-export async function GET(request: NextRequest) {
-  try {
-    const { workspace } = await checkWorkspaceAuth(request)
-
-    // Fetch all LLM calls for the workspace (ordered by conversation)
+export const conversationsRouter = router({
+  /**
+   * List conversations with aggregated usage and pricing
+   */
+  list: workspaceProcedure.query(async ({ ctx }) => {
+    // Fetch all LLM calls for the workspace
     const responses = await selectLlmCalls({
-      workspaceId: workspace.id,
+      workspaceId: ctx.workspace.id,
       limit: 10000, // High limit to get all conversations
     })
 
@@ -84,28 +84,8 @@ export async function GET(request: NextRequest) {
           new Date(b.lastLlmCall).getTime() - new Date(a.lastLlmCall).getTime()
       )
 
-    return NextResponse.json({
+    return {
       conversations,
-    })
-  } catch (error) {
-    console.error('Error fetching conversations:', error)
-    if (
-      error instanceof Error &&
-      (error.message.includes('X-Workspace-Id') ||
-        error.message.includes('Workspace not found') ||
-        error.message.includes('Unauthorized'))
-    ) {
-      return NextResponse.json(
-        { error: error.message },
-        { status: error.message.includes('Unauthorized') ? 401 : 400 }
-      )
     }
-    return NextResponse.json(
-      {
-        error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error',
-      },
-      { status: 500 }
-    )
-  }
-}
+  }),
+})

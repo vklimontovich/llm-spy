@@ -1,11 +1,11 @@
 'use client'
 
-import { Button } from 'antd'
+import { Button, notification } from 'antd'
 import { Lock, Unlock } from 'lucide-react'
 import { useState, useEffect } from 'react'
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useSearchParams } from 'next/navigation'
-import { useWorkspaceApi } from '@/lib/api'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 
 interface ShareButtonProps {
   requestId: string
@@ -15,15 +15,12 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
   const searchParams = useSearchParams()
   const [copyText, setCopyText] = useState('Copy Public Link')
   const queryClient = useQueryClient()
-  const api = useWorkspaceApi()
+  const trpc = useWorkspaceTrpc()
 
   // Fetch the current share status
   const { data: shareStatus, isLoading } = useQuery({
     queryKey: ['share-status', requestId],
-    queryFn: async () => {
-      const response = await api.get(`/requests/${requestId}/status`)
-      return response.data
-    },
+    queryFn: () => trpc.requests.getStatus.query({ id: requestId }),
     refetchInterval: false,
     staleTime: 30000, // Consider data stale after 30 seconds
   })
@@ -36,16 +33,20 @@ export default function ShareButton({ requestId }: ShareButtonProps) {
   }, [requestId])
 
   const toggleShareMutation = useMutation({
-    mutationFn: async (makePublic: boolean) => {
-      const response = await api.post(`/requests/${requestId}/share`, {
-        public: makePublic,
-      })
-      return response.data
-    },
+    mutationFn: (makePublic: boolean) =>
+      trpc.requests.setPublic.mutate({ id: requestId, public: makePublic }),
     onSuccess: () => {
       // Invalidate both the share status and the requests list
       queryClient.invalidateQueries({ queryKey: ['share-status', requestId] })
       queryClient.invalidateQueries({ queryKey: ['requests'] })
+    },
+    onError: (error: Error) => {
+      console.error('Failed to toggle share status:', error)
+      notification.error({
+        message: 'Failed to update sharing settings',
+        description:
+          error.message || 'An error occurred while updating sharing settings',
+      })
     },
   })
 

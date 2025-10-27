@@ -1,39 +1,14 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
 import { Button } from 'antd'
 import { PlusOutlined } from '@ant-design/icons'
-import { useRouter, useParams } from 'next/navigation'
+import { useParams, useRouter } from 'next/navigation'
 import UpstreamList from '@/components/UpstreamList'
 import GettingStarted from '@/components/GettingStarted'
-import { useWorkspaceApi } from '@/lib/api'
 
 export default function UpstreamsPage() {
   const router = useRouter()
   const params = useParams()
-  const api = useWorkspaceApi()
-
-  const {
-    data: upstreams,
-    isLoading,
-    error,
-  } = useQuery({
-    queryKey: ['upstreams'],
-    queryFn: async () => {
-      const response = await api.get('/upstreams')
-      return response.data
-    },
-  })
-
-  if (error) {
-    return (
-      <div className="p-6">
-        <div className="text-red-600">
-          Error loading upstreams: {error.message}
-        </div>
-      </div>
-    )
-  }
 
   return (
     <div className="p-6 space-y-6">
@@ -53,9 +28,9 @@ export default function UpstreamsPage() {
         </Button>
       </div>
 
-      <UpstreamList upstreams={upstreams || []} isLoading={isLoading} />
+      <UpstreamList />
 
-      <GettingStarted header="How to Connect" upstreams={upstreams || []} />
+      <GettingStarted header="How to Connect" />
     </div>
   )
 }

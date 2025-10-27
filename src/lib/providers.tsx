@@ -3,7 +3,7 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { useState } from 'react'
 import { AntdRegistry } from '@ant-design/nextjs-registry'
-import { ConfigProvider } from 'antd'
+import { ConfigProvider, App } from 'antd'
 import { SessionProvider } from 'next-auth/react'
 
 export function RootProviders({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,9 @@ export function RootProviders({ children }: { children: React.ReactNode }) {
     <SessionProvider>
       <QueryClientProvider client={queryClient}>
         <AntdRegistry>
-          <ConfigProvider>{children}</ConfigProvider>
+          <ConfigProvider>
+            <App>{children}</App>
+          </ConfigProvider>
         </AntdRegistry>
       </QueryClientProvider>
     </SessionProvider>

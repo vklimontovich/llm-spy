@@ -33,7 +33,9 @@
 ## Environment Variables
 
 - See `src/lib/server-env.ts` for the complete list of environment variables
-- Key required variables:
-  - `DATABASE_URL` - PostgreSQL connection string
-  - `GOOGLE_CLIENT_ID` - Google OAuth client ID
-  - `GOOGLE_CLIENT_SECRET` - Google OAuth client secret
+- Env variables should be never accessed via `process.env` directly, use `serverEnv` from @src/lib/server-env.ts instead
+
+## useQuery
+
+- Unless instructed, always rethrow errors from useQuery calls instead of handling them locally. We have an upper boundary
+- Always set onError handler for useMutation calls. In the handler log error and show toast notification to the user via antd `notification.error`

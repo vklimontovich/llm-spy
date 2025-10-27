@@ -20,15 +20,14 @@ import JsonView from './JsonView'
 import SmartContentView from './SmartContentView'
 import { LlmRequest } from '@/lib/route-types'
 import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
-import axios from 'axios'
 import { getParserForProvider } from '@/lib/format'
 import { requireDefined } from '@/lib/preconditions'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 
 const { Text } = Typography
 
 interface RequestViewProps {
   requestId: string
-  workspaceId?: string
 }
 
 // Memoized Chat Tab Component
@@ -298,10 +297,7 @@ const ResponseTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
 })
 ResponseTab.displayName = 'ResponseTab'
 
-export default function RequestView({
-  requestId,
-  workspaceId,
-}: RequestViewProps) {
+export default function RequestView({ requestId }: RequestViewProps) {
   const searchParams = useSearchParams()
 
   // Get tab from URL params, default to 'chat'
@@ -309,6 +305,7 @@ export default function RequestView({
   const validTabs = ['chat', 'request', 'response']
   const currentTab =
     tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
+  const trpc = useWorkspaceTrpc()
 
   // Fetch combined data (request, response, and conversation)
   const {
@@ -317,18 +314,7 @@ export default function RequestView({
     error,
   } = useQuery({
     queryKey: ['body', requestId, 'combined'],
-    queryFn: async () => {
-      const config = workspaceId
-        ? {
-            params: { id: requestId },
-            headers: { 'X-Workspace-Id': workspaceId },
-          }
-        : {
-            params: { id: requestId },
-          }
-      const response = await axios.get('/api/body', config)
-      return response.data
-    },
+    queryFn: () => trpc.requests.getBody.query({ id: requestId }),
     enabled: !!requestId,
   })
 
@@ -364,6 +350,11 @@ export default function RequestView({
         </p>
       </div>
     )
+  }
+
+  // Guard clause for no data
+  if (!combinedData) {
+    return null
   }
 
   // Memoize tab items to prevent re-renders

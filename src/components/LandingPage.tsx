@@ -117,7 +117,7 @@ const Navigation = ({ loggedIn }: { loggedIn: boolean }) => (
           {loggedIn ? (
             <Link
               href="/app"
-              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium"
+              className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 !text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium"
             >
               {copy.common.openApp}
             </Link>
@@ -131,7 +131,7 @@ const Navigation = ({ loggedIn }: { loggedIn: boolean }) => (
               </Link>
               <Link
                 href="/app"
-                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium"
+                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-purple-600 !text-white rounded-lg hover:shadow-lg transition-all duration-200 font-medium"
               >
                 {copy.common.getStarted}
               </Link>
@@ -452,7 +452,7 @@ export default function LandingPage({ loggedIn = false }: LandingPageProps) {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link
               href="/app"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-xl transition-all duration-200 font-semibold text-lg group"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 !text-white rounded-xl hover:shadow-xl transition-all duration-200 font-semibold text-lg group"
             >
               {copy.hero.cta.primary}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />
@@ -569,11 +569,13 @@ claude
                 id: 'anthropic',
                 name: 'anthropic',
                 url: 'https://api.anthropic.com',
+                inputFormat: 'anthropic' as const,
               },
               {
                 id: 'openai',
                 name: 'openai',
                 url: 'https://api.openai.com',
+                inputFormat: 'openai' as const,
               },
             ]}
             keys={[
@@ -754,7 +756,7 @@ claude
             <p className="text-gray-500 mb-8">{copy.pricing.description}</p>
             <Link
               href="/app"
-              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-xl hover:shadow-xl transition-all duration-200 font-semibold text-lg group"
+              className="inline-flex items-center gap-2 px-8 py-4 bg-gradient-to-r from-blue-600 to-purple-600 !text-white rounded-xl hover:shadow-xl transition-all duration-200 font-semibold text-lg group"
             >
               {copy.pricing.cta}
               <ArrowRight className="w-5 h-5 group-hover:translate-x-1 transition-transform" />

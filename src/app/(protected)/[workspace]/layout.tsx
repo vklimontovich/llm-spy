@@ -3,6 +3,7 @@ import WorkspaceHeader from '@/components/WorkspaceHeader'
 import { getSession, requireWorkspaceAccess } from '@/lib/auth'
 import { requireDefined } from '@/lib/preconditions'
 import { setupWorkspace } from '@/lib/setup-workspace'
+import { redirect } from 'next/navigation'
 
 export default async function ProtectedAuthLayout({
   children,
@@ -13,10 +14,13 @@ export default async function ProtectedAuthLayout({
 }>) {
   // Get session server-side
   const session = await getSession()
-  const userEmail = requireDefined(
-    session?.user?.email,
-    'User email is required'
-  )
+
+  // If no session or no email, redirect to signin
+  if (!session || !session.user?.email) {
+    redirect('/signin')
+  }
+
+  const userEmail = requireDefined(session.user.email, 'User email is required')
 
   // Get workspace details and verify access
   const { workspace: workspaceSlug } = await params

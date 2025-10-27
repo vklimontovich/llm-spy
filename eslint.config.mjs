@@ -29,7 +29,12 @@ const eslintConfig = [
     },
   },
   {
-    files: ['src/lib/server-env.ts', 'src/lib/client-env.ts', 'src/lib/build.ts'],
+    files: [
+      'src/lib/server-env.ts',
+      'src/lib/client-env.ts',
+      'src/lib/build.ts',
+      'src/lib/auth-config.ts',
+    ],
     rules: {
       'no-restricted-syntax': 'off',
     },

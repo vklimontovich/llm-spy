@@ -6,6 +6,10 @@ import { assertDefined } from '@/lib/preconditions'
 import { serverEnv } from '@/lib/server-env'
 import { isBuildPhase } from '@/lib/build'
 
+if (!process.env.NEXTAUTH_URL && serverEnv.APP_ORIGIN) {
+  process.env.NEXTAUTH_URL = serverEnv.APP_ORIGIN
+}
+
 // Lazy getter to avoid evaluating serverEnv values during Next.js build phase
 // During build, Next.js analyzes routes which would trigger hash(undefined)
 // since serverEnv bypasses validation when NEXT_PHASE=phase-production-build
@@ -18,22 +22,6 @@ export function getAuthOptions(): NextAuthOptions {
       secret: 'build-time-placeholder',
     }
   }
-
-  // Use APP_ORIGIN for all auth URLs
-  const appOrigin = serverEnv.APP_ORIGIN.trim().replace(/\/$/, '')
-
-  // Set NEXTAUTH_URL from APP_ORIGIN
-  if (!process.env.NEXTAUTH_URL) {
-    process.env.NEXTAUTH_URL = appOrigin
-  }
-
-  // Log auth configuration for debugging redirect_uri issues
-  console.log('[NextAuth Config]', {
-    APP_ORIGIN: appOrigin,
-    NEXTAUTH_URL: process.env.NEXTAUTH_URL,
-    redirectUri: `${appOrigin}/api/auth/callback/google`,
-    nodeEnv: process.env.NODE_ENV,
-  })
 
   const config: NextAuthOptions = {
     pages: {

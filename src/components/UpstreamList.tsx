@@ -1,20 +1,19 @@
 'use client'
 
 import { useParams, useRouter } from 'next/navigation'
-import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { useState } from 'react'
-import { Button } from 'antd'
+import { Button, notification } from 'antd'
 import GettingStarted from './GettingStarted'
 import {
   Activity,
   Edit3,
-  Hash,
   Link2,
   MoreVertical,
   Server,
   Trash2,
 } from 'lucide-react'
-import { useWorkspaceApi } from '@/lib/api'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 
 interface Upstream {
   id: string
@@ -24,11 +23,6 @@ interface Upstream {
   inputFormat?: string
   createdAt: string
   updatedAt: string
-}
-
-interface UpstreamListProps {
-  upstreams: Upstream[]
-  isLoading: boolean
 }
 
 // Loading Skeleton Component
@@ -122,12 +116,6 @@ const UpstreamCard = ({
   const params = useParams()
   const workspaceSlug = params.workspace as string
 
-  const headerCount = upstream.headers
-    ? Array.isArray(upstream.headers)
-      ? upstream.headers.length
-      : Object.keys(upstream.headers).length
-    : 0
-
   return (
     <div
       className={`
@@ -151,12 +139,6 @@ const UpstreamCard = ({
                 </div>
               ) : (
                 <span className="text-xs text-gray-400">No URL configured</span>
-              )}
-              {headerCount > 0 && (
-                <div className="flex items-center gap-1.5 text-xs text-gray-500">
-                  <Hash className="w-3 h-3" />
-                  <span>{headerCount} headers</span>
-                </div>
               )}
             </div>
           </div>
@@ -192,14 +174,6 @@ const UpstreamCard = ({
             View Requests
           </Button>
         </div>
-
-        <div className="flex items-end gap-1.5 text-xs text-gray-400">
-          {upstream.inputFormat && (
-            <span className=" px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-              {upstream.inputFormat.toUpperCase()}
-            </span>
-          )}
-        </div>
       </div>
     </div>
   )
@@ -223,23 +197,36 @@ const EmptyState = () => (
 )
 
 // Main Component
-export default function UpstreamList({
-  upstreams,
-  isLoading,
-}: UpstreamListProps) {
+export default function UpstreamList() {
+  const trpc = useWorkspaceTrpc()
   const queryClient = useQueryClient()
   const [deletingId, setDeletingId] = useState<string | null>(null)
-  const api = useWorkspaceApi()
+
+  const {
+    data: upstreams,
+    isLoading,
+    error,
+  } = useQuery({
+    queryKey: ['upstreams'],
+    queryFn: async () => {
+      const result: any = await trpc.upstreams.list.query()
+      return result as Upstream[]
+    },
+  })
 
   const deleteMutation = useMutation({
-    mutationFn: async (id: string) =>
-      (await api.delete(`/upstreams/${id}`)).data,
+    mutationFn: (id: string) => trpc.upstreams.delete.mutate({ id }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
       setDeletingId(null)
     },
     onError: (error: Error) => {
       console.error('Failed to delete upstream:', error)
+      notification.error({
+        message: 'Failed to delete upstream',
+        description:
+          error.message || 'An error occurred while deleting upstream',
+      })
       setDeletingId(null)
     },
   })
@@ -253,6 +240,10 @@ export default function UpstreamList({
       setDeletingId(upstream.id)
       deleteMutation.mutate(upstream.id)
     }
+  }
+
+  if (error) {
+    throw error
   }
 
   if (isLoading) {

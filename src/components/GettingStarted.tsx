@@ -18,10 +18,11 @@ import {
 import { useParams } from 'next/navigation'
 import { Select, Card, Typography, Alert, Spin, Tabs } from 'antd'
 import { useQuery } from '@tanstack/react-query'
-import { useWorkspaceApi } from '@/lib/api'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 import { useFrontendConfig } from '@/lib/frontend-config-provider'
 import KeyDisplay from './KeyDisplay'
-import { KeyModel } from '@/lib/model/keys'
+import type { Key } from '@/schemas/keys'
+import type { Upstream } from '@/schemas/upstreams'
 import { DOMAIN } from '@/lib/copy'
 
 const { Title, Text, Paragraph } = Typography
@@ -52,30 +53,18 @@ function joinLines(lines: (string | React.ReactNode)[]): React.ReactNode {
   ))
 }
 
+// Component-specific types extending schema types
+type UpstreamForDisplay = Pick<Upstream, 'id' | 'name' | 'url' | 'inputFormat'>
+
+type ApiKey = Key & { name?: string }
+
 interface GettingStartedProps {
   header?: string
-  keys?: Array<KeyModel & { name?: string }>
-  upstreams?: Array<{
-    id: string
-    name: string
-    url?: string
-    headers?: Record<string, string>
-  }>
+  keys?: ApiKey[]
+  upstreams?: UpstreamForDisplay[]
   fixedUpstreamId?: string // When set, upstream selector is disabled
   isModal?: boolean // When true, renders in modal-friendly layout
   demoMode?: boolean // When true, uses static data without API calls
-}
-
-interface Upstream {
-  id: string
-  name: string
-  url?: string
-  headers?: Record<string, string>
-  inputFormat?: string
-}
-
-interface ApiKey extends KeyModel {
-  name?: string
 }
 
 type Platform = 'claude-code' | 'codex' | 'general'
@@ -102,7 +91,7 @@ function KeyDisplayWrapper({
   return <KeyDisplay hint={hint || 'your-api-key'} keyId={keyId} mode={mode} />
 }
 
-function detectProvider(upstream: Upstream): string | null {
+function detectProvider(upstream: UpstreamForDisplay): string | null {
   // Use explicit inputFormat if available
   if (upstream.inputFormat) {
     const format = upstream.inputFormat.toLowerCase()
@@ -175,7 +164,7 @@ function ClaudeCodeInstructions({
   apiKey,
   baseUrl,
 }: {
-  upstream: Upstream
+  upstream: UpstreamForDisplay
   apiKey: ApiKey
   baseUrl: string
 }) {
@@ -212,7 +201,7 @@ function CodexInstructions({
   apiKey,
   baseUrl,
 }: {
-  upstream: Upstream
+  upstream: UpstreamForDisplay
   apiKey: ApiKey
   baseUrl: string
 }) {
@@ -276,7 +265,7 @@ function GeneralInstructions({
   apiKey,
   baseUrl,
 }: {
-  upstream: Upstream
+  upstream: UpstreamForDisplay
   apiKey: ApiKey
   baseUrl: string
 }) {
@@ -562,7 +551,7 @@ function GettingStartedWithWorkspace({
 }: Omit<GettingStartedProps, 'demoMode'>) {
   const params = useParams()
   const workspaceSlug = params?.workspace as string | undefined
-  const api = useWorkspaceApi()
+  const trpc = useWorkspaceTrpc()
   const config = useFrontendConfig()
 
   // Load keys if not provided
@@ -570,8 +559,7 @@ function GettingStartedWithWorkspace({
     queryKey: ['keys'],
     queryFn: async () => {
       if (!workspaceSlug) return []
-      const response = await api.get(`/workspaces/${workspaceSlug}/keys`)
-      return response.data as ApiKey[]
+      return trpc.keys.list.query({ workspaceIdOrSlug: workspaceSlug })
     },
     enabled: !propKeys && !!workspaceSlug,
   })
@@ -579,22 +567,19 @@ function GettingStartedWithWorkspace({
   // Load upstreams if not provided
   const { data: loadedUpstreams, isLoading: upstreamsLoading } = useQuery({
     queryKey: ['upstreams'],
-    queryFn: async () => {
-      const response = await api.get('/upstreams')
-      return response.data as Upstream[]
-    },
+    queryFn: () => trpc.upstreams.list.query(),
     enabled: !propUpstreams,
   })
 
-  const keys = Array.isArray(propKeys)
+  const keys: ApiKey[] = Array.isArray(propKeys)
     ? propKeys
     : Array.isArray(loadedKeys)
       ? loadedKeys
       : []
-  const upstreams = Array.isArray(propUpstreams)
+  const upstreams: UpstreamForDisplay[] = Array.isArray(propUpstreams)
     ? propUpstreams
     : Array.isArray(loadedUpstreams)
-      ? loadedUpstreams
+      ? (loadedUpstreams as UpstreamForDisplay[])
       : []
   const isLoading = keysLoading || upstreamsLoading
 
@@ -635,7 +620,7 @@ function GettingStartedContent({
 }: {
   header?: string
   keys: ApiKey[]
-  upstreams: Upstream[]
+  upstreams: UpstreamForDisplay[]
   fixedUpstreamId?: string
   isModal: boolean
   demoMode: boolean

@@ -1,7 +1,7 @@
 'use client'
 
 import { useQuery, useQueryClient } from '@tanstack/react-query'
-import { Table, Button, Switch, Tooltip } from 'antd'
+import { Table, Button, Tooltip } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
 import { RefreshCw, User, Bot, Database } from 'lucide-react'
@@ -9,9 +9,9 @@ import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
 import GettingStarted from '@/components/GettingStarted'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { useWorkspaceApi } from '@/lib/api'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
-import { LlmCall, Filter } from '@/types/requests'
+import { LlmCall, Filter } from '@/schemas/requests'
+import { useWorkspaceTrpc } from '@/lib/trpc'
 
 const PAGE_SIZE = 100
 
@@ -69,9 +69,6 @@ function FilterDisplay({ filters, onRemove, onClearAll }: FilterDisplayProps) {
 
 export default function LlmCallsTable() {
   const [selectedRequest, setSelectedRequest] = useState<LlmCall | null>(null)
-  const [liveRefresh, setLiveRefresh] = useState(false)
-  const [lastRefreshed, setLastRefreshed] = useState<Date | null>(null)
-  const [offset, setOffset] = useState(0)
   const [hasMore, setHasMore] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [allRequests, setAllRequests] = useState<LlmCall[]>([])
@@ -80,8 +77,9 @@ export default function LlmCallsTable() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const queryClient = useQueryClient()
-  const api = useWorkspaceApi()
   const { workspace } = useWorkspace()
+  const trpc = useWorkspaceTrpc()
+  const [cursor, setCursor] = useState<string | undefined>(undefined)
 
   // Load filters from URL on mount
   useEffect(() => {
@@ -99,23 +97,14 @@ export default function LlmCallsTable() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run on mount
 
-  const { data, isLoading, error, refetch } = useQuery({
-    queryKey: ['requests', offset, filters],
-    queryFn: async () => {
-      const params: any = {
+  const { data, isLoading, error, isFetching } = useQuery({
+    queryKey: ['requests', cursor, filters],
+    queryFn: () =>
+      trpc.requests.list.query({
+        cursor,
         limit: PAGE_SIZE,
-        offset: offset,
-      }
-
-      if (filters.length > 0) {
-        params.filter = JSON.stringify(filters)
-      }
-
-      const response = await api.get('/requests', { params })
-      const result = response.data
-      setHasMore(result.items && result.items.length === PAGE_SIZE)
-      return result
-    },
+        filter: filters.length > 0 ? filters : undefined,
+      }),
   })
 
   // Let the error boundary above catch errors
@@ -123,23 +112,17 @@ export default function LlmCallsTable() {
     throw error
   }
 
-  // Update last refreshed when data changes
-  useEffect(() => {
-    if (data) {
-      setLastRefreshed(new Date())
-    }
-  }, [data])
-
   // Merge pages
   useEffect(() => {
     if (data?.items) {
-      if (offset === 0) {
+      if (!cursor) {
         setAllRequests(data.items)
       } else {
         setAllRequests(prev => [...prev, ...data.items])
       }
+      setHasMore(data.hasNextPage)
     }
-  }, [data, offset])
+  }, [data, cursor])
 
   // Handle URL params on mount
   useEffect(() => {
@@ -166,11 +149,12 @@ export default function LlmCallsTable() {
   }
 
   const handleRefresh = () => {
-    setOffset(0)
-    setAllRequests([])
+    // Reset cursor to load from the beginning
+    setCursor(undefined)
     setHasMore(true)
+    // Invalidate all request queries to force a refetch
+    // The effect will handle updating allRequests when new data arrives
     queryClient.invalidateQueries({ queryKey: ['requests'] })
-    refetch()
   }
 
   const updateFiltersInUrl = (newFilters: Filter[]) => {
@@ -194,26 +178,26 @@ export default function LlmCallsTable() {
     if (!exists) {
       const newFilters = [...filters, filter]
       setFilters(newFilters)
-      setOffset(0)
-      setAllRequests([])
+      setCursor(undefined)
       setHasMore(true)
       updateFiltersInUrl(newFilters)
+      // The effect will handle updating allRequests when new data arrives
     }
   }
 
   const removeFilter = (index: number) => {
     const newFilters = filters.filter((_, i) => i !== index)
     setFilters(newFilters)
-    setOffset(0)
-    setAllRequests([])
+    setCursor(undefined)
     setHasMore(true)
     updateFiltersInUrl(newFilters)
+    // The effect will handle updating allRequests when new data arrives
   }
 
   const handleLoadMore = async () => {
-    if (!hasMore || loadingMore) return
+    if (!hasMore || loadingMore || !data?.nextCursor) return
     setLoadingMore(true)
-    setOffset(prev => prev + PAGE_SIZE)
+    setCursor(data.nextCursor)
     setLoadingMore(false)
   }
 
@@ -561,17 +545,11 @@ export default function LlmCallsTable() {
             <Button
               icon={<RefreshCw className="w-4 h-4" />}
               onClick={handleRefresh}
-              loading={isLoading}
+              loading={isFetching}
               size="large"
             >
-              Refresh Now
+              Refresh
             </Button>
-            <Switch
-              checked={liveRefresh}
-              onChange={setLiveRefresh}
-              checkedChildren="Live"
-              unCheckedChildren="Live"
-            />
           </div>
         </div>
         <FilterDisplay
@@ -579,59 +557,55 @@ export default function LlmCallsTable() {
           onRemove={removeFilter}
           onClearAll={() => {
             setFilters([])
-            setOffset(0)
-            setAllRequests([])
+            setCursor(undefined)
             setHasMore(true)
             updateFiltersInUrl([])
+            // The effect will handle updating allRequests when new data arrives
           }}
         />
-        <div className="flex items-center justify-between mb-4">
-          <div />
-          {lastRefreshed && (
-            <div className="text-xs text-gray-500">
-              Last refreshed at {lastRefreshed.toLocaleTimeString()} (
-              {formatDate(lastRefreshed.toISOString()).ago})
-            </div>
-          )}
-        </div>
       </div>
 
       <div className="px-6 pb-6">
         <div className="bg-white rounded-lg shadow">
-          <Table
-            columns={columns}
-            dataSource={allRequests}
-            loading={isLoading}
-            rowKey="id"
-            pagination={false}
-            scroll={{ x: true }}
-            size="small"
-            className={styles.compactTable}
-            locale={{
-              emptyText:
-                !isLoading &&
-                allRequests.length === 0 &&
-                filters.length === 0 ? (
-                  <div className="text-left">
-                    <div className="text-center py-8">
-                      <Database className="w-12 h-12 mx-auto mb-3 text-gray-400" />
-                      <div className="text-lg font-medium text-gray-600">
-                        No data to display
+          <div
+            className={isFetching && allRequests.length > 0 ? 'opacity-50' : ''}
+          >
+            {/* No row-level click; links inside cells handle navigation */}
+            <Table
+              columns={columns}
+              dataSource={allRequests}
+              loading={isFetching && allRequests.length === 0}
+              rowKey="id"
+              pagination={false}
+              scroll={{ x: true }}
+              size="small"
+              className={styles.compactTable}
+              locale={{
+                emptyText:
+                  !isFetching &&
+                  allRequests.length === 0 &&
+                  filters.length === 0 ? (
+                    <div className="text-left">
+                      <div className="text-center py-8">
+                        <Database className="w-12 h-12 mx-auto mb-3 text-gray-400" />
+                        <div className="text-lg font-medium text-gray-600">
+                          No data to display
+                        </div>
                       </div>
+                      <GettingStarted header="Get Started - Make Your First API Call" />
                     </div>
-                    <GettingStarted header="Get Started - Make Your First API Call" />
-                  </div>
-                ) : (
-                  'No data'
-                ),
-            }}
-            // No row-level click; links inside cells handle navigation
-          />
+                  ) : (
+                    'No data'
+                  ),
+              }}
+            />
+          </div>
           {hasMore && (
             <div className="p-4 text-center border-t">
               <Button
                 onClick={handleLoadMore}
-                loading={loadingMore || isLoading}
+                loading={loadingMore}
+                disabled={isLoading || isFetching}
                 size="large"
               >
                 Load More

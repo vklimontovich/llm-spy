@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useRouter, useParams } from 'next/navigation'
-import { Button, Select, Modal } from 'antd'
+import { Button, Select, Modal, notification } from 'antd'
 import {
   Plus,
   Trash2,
@@ -16,30 +16,24 @@ import {
   Loader2,
   AlertCircle,
 } from 'lucide-react'
-import { useWorkspaceApi } from '@/lib/api'
 import { validateUpstreamName } from '@/lib/model/validation'
 import GettingStarted from './GettingStarted'
+import { useWorkspaceTrpc } from '@/lib/trpc'
+import type { Upstream, Header as SchemaHeader } from '@/schemas/upstreams'
 
-interface Header {
-  name: string
-  value: string
+// Client-side header type with override instead of priority for form state
+type ClientHeader = Omit<SchemaHeader, 'priority'> & {
   override: boolean
 }
 
-interface OtelCollector {
-  id?: string
-  url: string
-  headers: Header[]
-}
-
-interface UpstreamData {
-  name: string
-  url: string
-  headers: Header[]
-  inputFormat: string
-  outputFormat: string | null
-  keepAuthHeaders: boolean
-  otelUpstreams: OtelCollector[]
+// Client-side upstream type for form state
+type UpstreamFormData = Omit<Upstream, 'headers' | 'otelUpstreams'> & {
+  headers: ClientHeader[]
+  otelUpstreams: Array<{
+    id?: string
+    url: string
+    headers: ClientHeader[]
+  }>
 }
 
 interface UpstreamEditorProps {
@@ -53,8 +47,8 @@ const HeaderRow = ({
   onRemove,
   showOverride = true,
 }: {
-  header: Header
-  onChange: (header: Header) => void
+  header: ClientHeader
+  onChange: (header: ClientHeader) => void
   onRemove: () => void
   showOverride?: boolean
 }) => {
@@ -172,10 +166,9 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
   const router = useRouter()
   const params = useParams()
   const queryClient = useQueryClient()
-  const api = useWorkspaceApi()
   const isNew = id === 'new'
 
-  const [formData, setFormData] = useState<UpstreamData>({
+  const [formData, setFormData] = useState<UpstreamFormData>({
     name: '',
     url: 'https://api.anthropic.com',
     headers: [],
@@ -187,6 +180,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
 
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [nameError, setNameError] = useState<string | undefined>()
+  const trpc = useWorkspaceTrpc()
 
   const {
     data: upstream,
@@ -194,18 +188,17 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     error,
   } = useQuery({
     queryKey: ['upstream', id],
-    queryFn: async () => {
+    queryFn: () => {
       if (isNew) return null
-      const response = await api.get(`/upstreams/${id}`)
-      return response.data
+      return trpc.upstreams.getById.query({ id })
     },
     enabled: !isNew,
   })
 
-  const saveMutation = useMutation({
-    mutationFn: async (data: UpstreamData) => {
+  const createMutation = useMutation({
+    mutationFn: (data: UpstreamFormData) => {
       // Convert override boolean to priority for API
-      const apiData = {
+      const apiData: Upstream = {
         ...data,
         headers: data.headers.map(h => ({
           name: h.name,
@@ -221,36 +214,93 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
           })),
         })),
       }
-
-      if (isNew) {
-        const response = await api.post('/upstreams', apiData)
-        return response.data
-      } else {
-        const response = await api.put(`/upstreams/${id}`, apiData)
-        return response.data
-      }
+      return trpc.upstreams.create.mutate(apiData)
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['upstreams'] })
       router.push(`/${params.workspace}/upstreams`)
     },
+    onError: (error: Error) => {
+      console.error('Failed to create upstream:', error)
+      notification.error({
+        message: 'Failed to create upstream',
+        description:
+          error.message || 'An error occurred while creating upstream',
+      })
+    },
   })
+
+  const updateMutation = useMutation({
+    mutationFn: (data: UpstreamFormData) => {
+      // Convert override boolean to priority for API
+      const apiData: Upstream = {
+        ...data,
+        headers: data.headers.map(h => ({
+          name: h.name,
+          value: h.value,
+          priority: h.override ? ('high' as const) : ('low' as const),
+        })),
+        otelUpstreams: data.otelUpstreams.map(o => ({
+          ...o,
+          headers: o.headers.map(h => ({
+            name: h.name,
+            value: h.value,
+            priority: h.override ? ('high' as const) : ('low' as const),
+          })),
+        })),
+      }
+      return trpc.upstreams.update.mutate({ id, data: apiData })
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['upstreams'] })
+      router.push(`/${params.workspace}/upstreams`)
+    },
+    onError: (error: Error) => {
+      console.error('Failed to update upstream:', error)
+      notification.error({
+        message: 'Failed to update upstream',
+        description:
+          error.message || 'An error occurred while updating upstream',
+      })
+    },
+  })
+
+  const saveMutation = {
+    mutate: (data: UpstreamFormData) => {
+      if (isNew) {
+        createMutation.mutate(data)
+      } else {
+        updateMutation.mutate(data)
+      }
+    },
+    isPending: createMutation.isPending || updateMutation.isPending,
+  }
 
   useEffect(() => {
     if (upstream) {
+      // Cast to any to avoid TypeScript recursion depth errors with tRPC types
+      const upstreamData = upstream as any
+
       setFormData({
-        name: upstream.name || '',
-        url: upstream.url || '',
-        inputFormat: upstream.inputFormat || 'anthropic',
-        outputFormat: upstream.outputFormat || null,
-        keepAuthHeaders: upstream.keepAuthHeaders ?? false,
-        headers: Array.isArray(upstream.headers)
-          ? upstream.headers.map((h: any) => ({
+        name: upstreamData.name || '',
+        url: upstreamData.url || '',
+        inputFormat: (upstreamData.inputFormat || 'anthropic') as
+          | 'auto'
+          | 'anthropic'
+          | 'openai'
+          | 'otel',
+        outputFormat: (upstreamData.outputFormat || null) as
+          | 'anthropic'
+          | 'openai'
+          | null,
+        keepAuthHeaders: upstreamData.keepAuthHeaders ?? false,
+        headers: Array.isArray(upstreamData.headers)
+          ? upstreamData.headers.map((h: any) => ({
               name: h.name,
               value: h.value,
               override: h.priority === 'high',
             }))
-          : Object.entries(upstream.headers || {}).map(([name, value]) => ({
+          : Object.entries(upstreamData.headers || {}).map(([name, value]) => ({
               name,
               value: String(value),
               override: false,
@@ -297,7 +347,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     })
   }
 
-  const updateHeader = (index: number, header: Header) => {
+  const updateHeader = (index: number, header: ClientHeader) => {
     const newHeaders = [...formData.headers]
     newHeaders[index] = header
     setFormData({ ...formData, headers: newHeaders })
@@ -337,8 +387,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
     const defaultUrl =
       providerForUrl === 'anthropic'
         ? 'https://api.anthropic.com'
-        : providerForUrl === 'openai-chat' ||
-            providerForUrl === 'openai-responses'
+        : providerForUrl === 'openai'
           ? 'https://api.openai.com'
           : 'https://api.example.com'
     const knownDefaults = [
@@ -347,7 +396,11 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
       'https://api.example.com',
       '',
     ]
-    if (knownDefaults.includes(formData.url) && formData.url !== defaultUrl) {
+    if (
+      formData.url &&
+      knownDefaults.includes(formData.url) &&
+      formData.url !== defaultUrl
+    ) {
       setFormData(prev => ({ ...prev, url: defaultUrl }))
     }
   }, [formData.inputFormat, formData.outputFormat, formData.url])
@@ -448,8 +501,7 @@ export default function UpstreamEditor({ id }: UpstreamEditorProps) {
                 placeholder={
                   providerForUrl === 'anthropic'
                     ? 'https://api.anthropic.com'
-                    : providerForUrl === 'openai-chat' ||
-                        providerForUrl === 'openai-responses'
+                    : providerForUrl === 'openai'
                       ? 'https://api.openai.com'
                       : 'https://api.example.com'
                 }

@@ -1,6 +1,6 @@
 import { prisma } from '@/lib/prisma'
 import { Prisma } from '@prisma/client'
-import { Filters, LlmCall } from '@/types/requests'
+import { Filters, LlmCall } from '@/schemas/requests'
 import { getParserForProvider } from '@/lib/format'
 import { computePriceUsd } from '@/lib/pricing'
 
