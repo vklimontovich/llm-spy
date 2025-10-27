@@ -12,7 +12,7 @@
     "format:check": "prettier --check .",
     "proto:fetch": "mkdir -p src/generated && rm -rf .tmp-proto && git clone --depth 1 --branch v1.7.0 https://github.com/open-telemetry/opentelemetry-proto.git .tmp-proto && cp -r .tmp-proto/opentelemetry src/generated/ && rm -rf .tmp-proto",
     "proto:generate": "pbjs -t static-module -w commonjs -p src/generated -o src/generated/otel-proto.js 'src/generated/opentelemetry/proto/**/*.proto' && pbts -o src/generated/otel-proto.d.ts src/generated/otel-proto.js",
-    "proto:update": "npm run proto:fetch && npm run proto:generate"
+    "proto:update": "bun run proto:fetch && bun run proto:generate"
   },
   "dependencies": {
     "@ai-sdk/openai": "^2.0.22",

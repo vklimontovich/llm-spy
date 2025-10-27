@@ -25,6 +25,12 @@ jobs:
       - name: Format check
         run: bun run format:check
 
+      - name: Format check
+        run: bun run format:check
+        
+      - name: Codegen
+        run: bun run proto:update
+
       - name: Lint
         run: bun run lint
 
