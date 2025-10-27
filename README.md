@@ -96,8 +96,6 @@ See the [complete list with descriptions](src/lib/server-env.ts) in the source c
 
 ## Self-Hosting with Docker
 
-> **Coming Soon** - Docker support is under development
-
 Docker deployment will follow this workflow:
 
 ### 1. Initialize Database
