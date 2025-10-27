@@ -8,6 +8,7 @@ import { requireDefined } from '@/lib/preconditions'
 import { parseSSEEvents } from '@/lib/sse-utils'
 import { getParserForProvider } from '@/lib/format'
 import { hasAuth } from '@/lib/auth'
+import { maskSecurityValues } from '@/lib/security'
 
 export const requestsRouter = router({
   /**
@@ -95,8 +96,14 @@ export const requestsRouter = router({
 
       const requestBody = response.requestBody
       const responseBody = response.responseBody
-      const requestHeaders = response.requestHeaders as Record<string, string>
-      const responseHeaders = response.responseHeaders as Record<string, string>
+      let requestHeaders = response.requestHeaders as Record<string, string>
+      let responseHeaders = response.responseHeaders as Record<string, string>
+
+      // Mask security headers if response is public
+      if (response.public) {
+        requestHeaders = maskSecurityValues(requestHeaders)
+        responseHeaders = maskSecurityValues(responseHeaders)
+      }
 
       // Process request
       let rawRequestBody: any = null
