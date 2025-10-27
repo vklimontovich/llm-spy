@@ -94,8 +94,8 @@ export const requestsRouter = router({
 
       // Mask security headers if response is public
       if (response.public) {
-        requestHeaders = maskSecurityValues(requestHeaders)
-        responseHeaders = maskSecurityValues(responseHeaders)
+        requestHeaders = maskSecurityValues(requestHeaders, { maskPII: true })
+        responseHeaders = maskSecurityValues(responseHeaders, { maskPII: true })
       }
 
       // Process request
