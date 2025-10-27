@@ -22,7 +22,7 @@ import { LlmRequest } from '@/lib/route-types'
 import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
 import { getParserForProvider } from '@/lib/format'
 import { requireDefined } from '@/lib/preconditions'
-import { useWorkspaceTrpc } from '@/lib/trpc'
+import { useTrpc } from '@/lib/trpc'
 
 const { Text } = Typography
 
@@ -169,9 +169,7 @@ const RequestTab = memo(({ llmRequest }: { llmRequest: LlmRequest }) => {
         </Text>
       ),
       children: llmRequest?.rawRequest?.body ? (
-        <Card className="bg-gray-50 border-0">
-          <SmartContentView data={llmRequest.rawRequest.body} />
-        </Card>
+        <SmartContentView data={llmRequest.rawRequest.body} />
       ) : (
         <div className="flex justify-center py-8">
           <Text type="secondary">No request body available</Text>
@@ -305,7 +303,7 @@ export default function RequestView({ requestId }: RequestViewProps) {
   const validTabs = ['chat', 'request', 'response']
   const currentTab =
     tabFromUrl && validTabs.includes(tabFromUrl) ? tabFromUrl : 'chat'
-  const trpc = useWorkspaceTrpc()
+  const trpc = useTrpc()
 
   // Fetch combined data (request, response, and conversation)
   const {

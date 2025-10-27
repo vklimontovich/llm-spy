@@ -39,3 +39,10 @@
 
 - Unless instructed, always rethrow errors from useQuery calls instead of handling them locally. We have an upper boundary
 - Always set onError handler for useMutation calls. In the handler log error and show toast notification to the user via antd `notification.error`
+
+## Git Operations
+
+- **Always** use git commands for file operations:
+  - After creating new files, run `git add <file>` to stage them
+  - For moving files, use `git mv <source> <destination>` instead of regular `mv`
+  - For removing files, use `git rm <file>` instead of regular `rm`

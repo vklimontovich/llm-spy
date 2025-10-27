@@ -45,13 +45,36 @@ const OpenAIReasoningPart = z.object({
   content: z.string().optional(),
 })
 
-const OpenAIContentPart = z.discriminatedUnion('type', [
+// Catch-all for unknown content types to prevent validation failures
+const OpenAIUnknownPart = z
+  .object({
+    type: z.string(),
+  })
+  .passthrough()
+
+const OpenAIContentPart = z.union([
   OpenAIInputTextPart,
   OpenAIOutputTextPart,
   OpenAIFunctionCallPart,
   OpenAIFunctionCallOutputPart,
   OpenAIReasoningPart,
+  OpenAIUnknownPart,
 ])
+
+type OpenAIFunctionCallPartType = z.infer<typeof OpenAIFunctionCallPart>
+
+// Type predicate to narrow OpenAIContentPart to OpenAIFunctionCallPart
+function isFunctionCallPart(
+  part: z.infer<typeof OpenAIContentPart>
+): part is OpenAIFunctionCallPartType {
+  return (
+    part.type === 'function_call' &&
+    'name' in part &&
+    typeof part.name === 'string' &&
+    'arguments' in part &&
+    typeof part.arguments === 'string'
+  )
+}
 
 const OpenAIMessage = z.object({
   type: z.literal('message'),
@@ -258,7 +281,7 @@ export function openaiToModel(
                   type: 'text' as const,
                   text: part.text,
                 })
-              } else if (part.type === 'function_call') {
+              } else if (isFunctionCallPart(part)) {
                 const toolCallId =
                   part.id || part.call_id || `tool-${Date.now()}`
                 toolCallMap.set(toolCallId, part.name)

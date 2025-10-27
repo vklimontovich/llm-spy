@@ -36,12 +36,51 @@ const AnthropicToolResultPart = z.object({
   is_error: z.boolean().optional(),
 })
 
-const AnthropicContentPart = z.discriminatedUnion('type', [
+const AnthropicImagePart = z.object({
+  type: z.literal('image'),
+  source: z.union([
+    z.object({
+      type: z.literal('base64'),
+      media_type: z.string(),
+      data: z.string(),
+    }),
+    z.object({
+      type: z.literal('url'),
+      url: z.string(),
+    }),
+  ]),
+})
+
+const AnthropicDocumentPart = z.object({
+  type: z.literal('document'),
+  source: z.union([
+    z.object({
+      type: z.literal('base64'),
+      media_type: z.string(),
+      data: z.string(),
+    }),
+    z.object({
+      type: z.literal('url'),
+      url: z.string(),
+    }),
+  ]),
+})
+
+// Catch-all for unknown content types to prevent validation failures
+const AnthropicUnknownPart = z
+  .object({
+    type: z.string(),
+  })
+  .passthrough()
+
+const AnthropicContentPart = z.union([
   AnthropicTextPart,
   AnthropicThinkingPart,
   AnthropicToolUsePart,
   AnthropicToolResultPart,
-  // add image/file parts here if needed
+  AnthropicImagePart,
+  AnthropicDocumentPart,
+  AnthropicUnknownPart,
 ])
 
 const AnthropicMessage = z.object({
@@ -202,12 +241,67 @@ export function anthropicToModel(
       typeof AnthropicThinkingPart
     >[]
 
+    const imageParts = parts.filter(p => p.type === 'image') as z.infer<
+      typeof AnthropicImagePart
+    >[]
+
+    const documentParts = parts.filter(p => p.type === 'document') as z.infer<
+      typeof AnthropicDocumentPart
+    >[]
+
     if (m.role === 'user') {
-      if (textParts.length > 0) {
+      // Build user content from text, images, and documents
+      const userContentParts: any[] = []
+
+      // Add text parts
+      userContentParts.push(
+        ...textParts.map(tp => ({ type: 'text' as const, text: tp.text }))
+      )
+
+      // Add image parts - convert to AI SDK format
+      userContentParts.push(
+        ...imageParts.map(ip => {
+          if (ip.source.type === 'base64') {
+            return {
+              type: 'image' as const,
+              image: `data:${ip.source.media_type};base64,${ip.source.data}`,
+              mimeType: ip.source.media_type,
+            }
+          } else {
+            // URL source
+            return {
+              type: 'image' as const,
+              image: ip.source.url,
+            }
+          }
+        })
+      )
+
+      // Add document parts - convert to AI SDK format (as file parts)
+      userContentParts.push(
+        ...documentParts.map(dp => {
+          if (dp.source.type === 'base64') {
+            return {
+              type: 'file' as const,
+              data: `data:${dp.source.media_type};base64,${dp.source.data}`,
+              mimeType: dp.source.media_type,
+            }
+          } else {
+            // URL source
+            return {
+              type: 'file' as const,
+              data: dp.source.url,
+            }
+          }
+        })
+      )
+
+      if (userContentParts.length > 0) {
+        // If only one text part and no images/docs, use string content
         const content =
-          textParts.length === 1
-            ? textParts[0].text // user content can be a string
-            : textParts.map(tp => ({ type: 'text' as const, text: tp.text }))
+          userContentParts.length === 1 && userContentParts[0].type === 'text'
+            ? userContentParts[0].text
+            : userContentParts
 
         out.push({
           role: 'user',

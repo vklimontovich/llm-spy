@@ -71,27 +71,20 @@ export const requestsRouter = router({
           throw new TRPCError({ code: 'UNAUTHORIZED' })
         }
 
-        if (!ctx.workspaceIdOrSlug) {
+        // Get the workspace from the response
+        if (!response.workspaceId) {
           throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message:
-              'X-Workspace-Id header or workspaceId parameter is required',
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Response has no associated workspace',
           })
         }
 
-        // Verify workspace access
+        // Verify user has access to the response's workspace
         const { requireWorkspaceAccess } = await import('@/lib/auth')
-        const workspace = await requireWorkspaceAccess(
-          ctx.workspaceIdOrSlug,
+        await requireWorkspaceAccess(
+          response.workspaceId,
           ctx.session.user.email
         )
-
-        if (response.workspaceId !== workspace.id) {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Access denied to this workspace resource',
-          })
-        }
       }
 
       const requestBody = response.requestBody

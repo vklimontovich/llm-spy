@@ -16,9 +16,9 @@ export function maskSecurityValues(
       if (value.length > 12) {
         const prefix = value.substring(0, 4)
         const suffix = value.substring(value.length - 4)
-        masked[key] = `${prefix}***MASKED***${suffix}`
+        masked[key] = `${prefix}***[redacted]***${suffix}`
       } else {
-        masked[key] = '***MASKED***'
+        masked[key] = '***[redacted]***'
       }
     } else {
       masked[key] = value

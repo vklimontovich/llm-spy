@@ -176,15 +176,38 @@ function MessageContent({ message }: { message: ModelMessage }) {
       case 'text':
         return <SmartContentView data={part.text} />
 
-      case 'image':
+      case 'image': {
+        const imageData = (part as any).image || (part as any).data
+        const mimeType = (part as any).mimeType
+
+        // Check if it's a valid image URL or data URL
+        const isValidImage =
+          typeof imageData === 'string' &&
+          (imageData.startsWith('http') || imageData.startsWith('data:image'))
+
         return (
-          <div>
-            <Text className="text-xs text-gray-500 mb-1">Image</Text>
-            <SmartContentView
-              data={(part as any).image || (part as any).data}
-            />
+          <div className="space-y-2">
+            <Text className="text-xs text-gray-500">
+              Image {mimeType && `(${mimeType})`}
+            </Text>
+            {isValidImage ? (
+              <img
+                src={imageData}
+                alt="Message attachment"
+                className="max-w-full max-h-96 rounded-lg border border-gray-200 shadow-sm"
+                style={{ objectFit: 'contain' }}
+              />
+            ) : (
+              <div className="p-3 bg-gray-50 rounded border border-gray-200">
+                <Text className="text-xs text-gray-600">
+                  Unable to display image
+                </Text>
+                <SmartContentView data={imageData} />
+              </div>
+            )}
           </div>
         )
+      }
 
       case 'file':
         return (

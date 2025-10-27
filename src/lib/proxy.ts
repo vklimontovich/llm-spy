@@ -11,16 +11,9 @@ import {
   validateAuthKey,
 } from '@/lib/route-helpers'
 import { extractConversationId } from '@/lib/session-utils'
-import {
-  ConversationModel,
-  detectProviderFromRequest,
-  getParserForProvider,
-} from '@/lib/format'
-import { isSSEResponse, parseSSEEvents } from '@/lib/sse-utils'
-import { getPricing } from '@/lib/pricing'
 import { maskSensitiveData } from '@/lib/log-masking'
-import { getPreview } from '@/lib/preview'
 import { maskSecurityValues } from '@/lib/security'
+import { postProcessResponse } from '@/lib/request-post-processing'
 
 export async function handleProxy(request: NextRequest) {
   const method = request.method.toUpperCase()
@@ -225,93 +218,15 @@ export async function handleProxy(request: NextRequest) {
       async (decompressedResponseBody, responseHeaders) => {
         const durationMs = Date.now() - startTime
 
-        // Try to parse the request/response to extract model information
-        let conversationModel: ConversationModel | undefined
-        let provider = upstream.headers?.['x-provider'] || null
-        let requestModel: string | undefined
-        let responseModel: string | undefined
-        let usageRaw: any | undefined
-        let pricingData: any | undefined
-        let preview: { input: string; output: string } | undefined
-
-        try {
-          // Try to detect provider from request if not set
-          if (!provider && decompressedRequestBody) {
-            const requestJson = JSON.parse(
-              decompressedRequestBody.toString('utf-8')
-            )
-            provider = detectProviderFromRequest(requestHeaders, requestJson)
-          }
-
-          // Get parser for the provider
-          const parser = getParserForProvider(provider)
-          if (parser && decompressedRequestBody) {
-            try {
-              const requestJson = JSON.parse(
-                decompressedRequestBody.toString('utf-8')
-              )
-              // Parse response as JSON or reconstruct from SSE when streaming
-              let responseJson: any
-              const responseText = decompressedResponseBody.toString('utf-8')
-              if (isSSEResponse(responseHeaders)) {
-                responseJson = parser.getJsonFromSSE(
-                  parseSSEEvents(responseText)
-                )
-              } else {
-                try {
-                  responseJson = JSON.parse(responseText)
-                } catch {
-                  // Fallback: attempt SSE reconstruction if JSON parsing fails
-                  responseJson = parser.getJsonFromSSE(
-                    parseSSEEvents(responseText)
-                  )
-                }
-              }
-
-              conversationModel = parser.createConversation(
-                requestJson,
-                responseJson
-              )
-              if (conversationModel) {
-                requestModel = conversationModel.models.request
-                responseModel = conversationModel.models.response
-                // Persist the raw usage block from provider if available
-                usageRaw =
-                  (responseJson as any)?.usage ?? conversationModel.usage
-
-                // Calculate pricing lookup; save raw cost node as-is
-                if (responseModel) {
-                  pricingData = await getPricing(responseModel)
-                  if (pricingData) {
-                    console.log(`[pricing] Found cost for ${responseModel}`)
-                  } else {
-                    console.warn(
-                      `[pricing] No cost found for model ${responseModel}`
-                    )
-                  }
-                }
-
-                // Generate preview from conversation
-                const messages = conversationModel.modelMessages
-                const lastUserMessage = messages.findLast(
-                  m => m.role === 'user'
-                )
-                const lastAssistantMessage = messages.findLast(
-                  m => m.role === 'assistant'
-                )
-
-                preview = {
-                  input: getPreview(lastUserMessage, 100),
-                  output: getPreview(lastAssistantMessage, 100),
-                }
-              }
-            } catch (parseError) {
-              console.warn('Failed to parse conversation model:', parseError)
-            }
-          }
-        } catch (error) {
-          console.warn('Failed to extract model information:', error)
-        }
+        // Post-process the response to extract model information
+        const initialProvider = upstream.headers?.['x-provider'] || null
+        const postProcessed = await postProcessResponse({
+          requestBody: decompressedRequestBody,
+          responseBody: decompressedResponseBody,
+          requestHeaders,
+          responseHeaders,
+          provider: initialProvider,
+        })
 
         // Store in database with new fields
         const conversationId = extractConversationId(requestHeaders)
@@ -331,12 +246,12 @@ export async function handleProxy(request: NextRequest) {
             conversationId,
             workspaceId,
             upstreamId: upstream.id,
-            provider,
-            requestModel,
-            responseModel,
-            usage: usageRaw,
-            pricing: pricingData,
-            preview,
+            provider: postProcessed.provider,
+            requestModel: postProcessed.requestModel,
+            responseModel: postProcessed.responseModel,
+            usage: postProcessed.usage,
+            pricing: postProcessed.pricing,
+            preview: postProcessed.preview,
             durationMs,
           },
         })
@@ -345,9 +260,11 @@ export async function handleProxy(request: NextRequest) {
             '[save] response saved:',
             saved.id,
             '| pricing:',
-            pricingData ? JSON.stringify(pricingData) : 'none',
+            postProcessed.pricing
+              ? JSON.stringify(postProcessed.pricing)
+              : 'none',
             '| usage:',
-            usageRaw ? 'present' : 'none'
+            postProcessed.usage ? 'present' : 'none'
           )
         } catch {}
       }

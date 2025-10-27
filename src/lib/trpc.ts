@@ -4,6 +4,31 @@ import { useMemo } from 'react'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 
 /**
+ * Hook to get a vanilla tRPC client without workspace context
+ * Use this for public endpoints that don't require workspace access
+ *
+ * @example
+ * const trpc = useTrpc()
+ * const { data } = useQuery({
+ *   queryKey: ['body', requestId],
+ *   queryFn: () => trpc.requests.getBody.query({ id: requestId })
+ * })
+ */
+export function useTrpc() {
+  return useMemo(
+    () =>
+      createTRPCProxyClient<AppRouter>({
+        links: [
+          httpBatchLink({
+            url: '/api/trpc',
+          }),
+        ],
+      }),
+    []
+  )
+}
+
+/**
  * Hook to get a vanilla tRPC client with workspace context
  * Returns a client that automatically includes X-Workspace-Id header
  *

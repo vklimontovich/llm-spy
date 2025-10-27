@@ -21,6 +21,7 @@ import { useQuery } from '@tanstack/react-query'
 import { useWorkspaceTrpc } from '@/lib/trpc'
 import { useFrontendConfig } from '@/lib/frontend-config-provider'
 import KeyDisplay from './KeyDisplay'
+import MultilineCodeBlock from './MultilineCodeBlock'
 import type { Key } from '@/schemas/keys'
 import type { Upstream } from '@/schemas/upstreams'
 import { DOMAIN } from '@/lib/copy'
@@ -189,9 +190,12 @@ function ClaudeCodeInstructions({
         </Paragraph>
       </div>
 
-      <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-        <code>{joinLines(command)}</code>
-      </pre>
+      <MultilineCodeBlock
+        language="bash"
+        className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+      >
+        {joinLines(command)}
+      </MultilineCodeBlock>
     </div>
   )
 }
@@ -237,18 +241,24 @@ function CodexInstructions({
         </Paragraph>
       </div>
 
-      <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-        <code>{joinLines(config)}</code>
-      </pre>
+      <MultilineCodeBlock
+        language="toml"
+        className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+      >
+        {joinLines(config)}
+      </MultilineCodeBlock>
 
       <div>
         <Text strong>2. Run Codex</Text>
         <Paragraph className="mt-2">Use the configured provider:</Paragraph>
       </div>
 
-      <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-        <code>{`codex --config model_provider="${providerName}" test`}</code>
-      </pre>
+      <MultilineCodeBlock
+        language="bash"
+        className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+      >
+        {`codex --config model_provider="${providerName}" test`}
+      </MultilineCodeBlock>
 
       <Alert
         message="Note"
@@ -453,27 +463,36 @@ function GeneralInstructions({
       key: 'curl',
       label: 'cURL',
       children: (
-        <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-          <code>{joinLines(curlExample)}</code>
-        </pre>
+        <MultilineCodeBlock
+          language="bash"
+          className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+        >
+          {joinLines(curlExample)}
+        </MultilineCodeBlock>
       ),
     },
     {
       key: 'python',
       label: 'Python',
       children: (
-        <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-          <code>{joinLines(pythonExample)}</code>
-        </pre>
+        <MultilineCodeBlock
+          language="python"
+          className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+        >
+          {joinLines(pythonExample)}
+        </MultilineCodeBlock>
       ),
     },
     {
       key: 'typescript',
       label: 'TypeScript',
       children: (
-        <pre className="bg-gray-50 rounded-lg p-4 text-xs overflow-auto border border-gray-200">
-          <code>{joinLines(typescriptExample)}</code>
-        </pre>
+        <MultilineCodeBlock
+          language="typescript"
+          className="rounded-lg p-1 text-xs overflow-auto border border-gray-200"
+        >
+          {joinLines(typescriptExample)}
+        </MultilineCodeBlock>
       ),
     },
   ]
@@ -489,23 +508,27 @@ function GeneralInstructions({
 
       <div>
         <Text strong>Base URL:</Text>
-        <pre className="bg-gray-50 rounded-lg p-3 text-xs overflow-auto border border-gray-200 mt-2">
-          <code>{baseUrl}</code>
-        </pre>
+        <MultilineCodeBlock
+          language="plaintext"
+          className="rounded-lg p-0.5 text-xs overflow-auto border border-gray-200 mt-2"
+        >
+          {baseUrl}
+        </MultilineCodeBlock>
       </div>
 
       <div>
         <Text strong>Authentication Header:</Text>
-        <pre className="bg-gray-50 rounded-lg p-3 text-xs overflow-auto border border-gray-200 mt-2">
-          <code>
-            {AUTH_HEADER}: {upstream.name}:
-            <KeyDisplayWrapper
-              hint={apiKey.hint}
-              keyId={apiKey.id}
-              mode="embed"
-            />
-          </code>
-        </pre>
+        <MultilineCodeBlock
+          language="plaintext"
+          className="rounded-lg p-0.5 text-xs overflow-auto border border-gray-200 mt-2"
+        >
+          {AUTH_HEADER}: {upstream.name}:
+          <KeyDisplayWrapper
+            hint={apiKey.hint}
+            keyId={apiKey.id}
+            mode="embed"
+          />
+        </MultilineCodeBlock>
       </div>
 
       <div>

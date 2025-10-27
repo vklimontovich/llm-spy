@@ -3,11 +3,10 @@
 import { useState } from 'react'
 import { Segmented, Button, message } from 'antd'
 import { Copy, Check } from 'lucide-react'
-import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
-import { oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import * as YAML from 'yaml'
 import dynamic from 'next/dynamic'
 import styles from './JsonView.module.css'
+import MultilineCodeBlock from './MultilineCodeBlock'
 
 const ReactJsonView = dynamic(() => import('@microlink/react-json-view'), {
   ssr: false,
@@ -66,14 +65,13 @@ export default function JsonView({
     if (simple) {
       return (
         <div className={styles.syntaxHighlighterWrapper}>
-          <SyntaxHighlighter
+          <MultilineCodeBlock
+            key="json-simple"
+            disableCopyIcon={true}
             language="json"
-            style={oneLight}
-            className="!m-0 !px-3 !py-4 !text-xs !leading-normal !bg-transparent !border-none"
-            wrapLongLines
           >
             {jsonString}
-          </SyntaxHighlighter>
+          </MultilineCodeBlock>
         </div>
       )
     }
@@ -82,27 +80,25 @@ export default function JsonView({
       case 'json':
         return (
           <div className={styles.syntaxHighlighterWrapper}>
-            <SyntaxHighlighter
+            <MultilineCodeBlock
+              key="json"
+              disableCopyIcon={true}
               language="json"
-              style={oneLight}
-              className="!m-0 !px-3 !py-4 !text-xs !leading-normal !bg-transparent !border-none"
-              wrapLongLines
             >
               {jsonString}
-            </SyntaxHighlighter>
+            </MultilineCodeBlock>
           </div>
         )
       case 'yaml':
         return (
           <div className={styles.syntaxHighlighterWrapper}>
-            <SyntaxHighlighter
+            <MultilineCodeBlock
+              key="yaml"
+              disableCopyIcon={true}
               language="yaml"
-              style={oneLight}
-              className="!m-0 !px-3 !py-4 !text-xs !leading-normal !bg-transparent !border-none"
-              wrapLongLines
             >
               {yamlString}
-            </SyntaxHighlighter>
+            </MultilineCodeBlock>
           </div>
         )
       case 'tree':
@@ -153,9 +149,7 @@ export default function JsonView({
           className="flex items-center"
         />
       </div>
-      <div className="overflow-auto rounded-lg shadow bg-gray-120">
-        {renderContent()}
-      </div>
+      <div className="">{renderContent()}</div>
     </div>
   )
 }
