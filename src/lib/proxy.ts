@@ -81,9 +81,15 @@ export async function handleProxy(request: NextRequest) {
       requestBody = await request.arrayBuffer()
       if (requestBody) {
         const requestContentEncoding = request.headers.get('content-encoding')
+        console.log(
+          `[proxy] Request content-encoding: ${requestContentEncoding || 'none'}, body size: ${requestBody.byteLength} bytes`
+        )
         decompressedRequestBody = await decompressResponse(
           requestBody,
           requestContentEncoding
+        )
+        console.log(
+          `[proxy] Decompressed request body size: ${decompressedRequestBody?.length || 0} bytes`
         )
       }
     }
@@ -160,7 +166,10 @@ export async function handleProxy(request: NextRequest) {
       : `/${url.pathname}`
     const targetUrl = `${baseUrl}${pathname}${searchString}`
     console.log(
-      `Proxying ${method.toUpperCase()} ${request.url} -> ${targetUrl}`
+      `[proxy] ${method.toUpperCase()} ${request.url} -> ${targetUrl}`
+    )
+    console.log(
+      `[proxy] Upstream: ${upstream.name} (${upstream.id}), workspace: ${workspaceId}`
     )
 
     // Track start time for duration
@@ -184,7 +193,11 @@ export async function handleProxy(request: NextRequest) {
     if (needsConversion && decompressedRequestBody) {
       throw new Error('Not implemented')
     } else {
-      console.log(`Proxying request to: ${targetUrl}`)
+      console.log(`[proxy] Sending request to: ${targetUrl}`)
+      console.log(
+        `[proxy] Request headers:`,
+        Object.keys(requestHeaders).join(', ')
+      )
       // Regular proxy without conversion
       response = await fetch(targetUrl, {
         method,
@@ -193,7 +206,9 @@ export async function handleProxy(request: NextRequest) {
       })
     }
 
-    console.log(`Response status: ${response.status}`)
+    console.log(
+      `[proxy] Response status: ${response.status}, content-type: ${response.headers.get('content-type')}, content-encoding: ${response.headers.get('content-encoding')}`
+    )
 
     // Log request body for audit purposes
     if (decompressedRequestBody) {
@@ -201,11 +216,11 @@ export async function handleProxy(request: NextRequest) {
       const maskedRequest = maskSensitiveData(requestText)
       if (maskedRequest.length > 2000) {
         console.log(
-          `Request Body (truncated):\n`,
+          `[proxy] Request Body (truncated):\n`,
           maskedRequest.substring(0, 2000) + '...'
         )
       } else {
-        console.log(`Request Body:\n`, maskedRequest)
+        console.log(`[proxy] Request Body:\n`, maskedRequest)
       }
     }
 
@@ -214,9 +229,14 @@ export async function handleProxy(request: NextRequest) {
       response,
       async (decompressedResponseBody, responseHeaders) => {
         const durationMs = Date.now() - startTime
+        console.log(`[proxy] Request duration: ${durationMs}ms`)
 
         // Post-process the response to extract model information
         const initialProvider = upstream.headers?.['x-provider'] || null
+        console.log(
+          `[proxy] Post-processing response, provider: ${initialProvider}`
+        )
+
         const postProcessed = await postProcessResponse({
           requestBody: decompressedRequestBody,
           responseBody: decompressedResponseBody,
@@ -226,6 +246,10 @@ export async function handleProxy(request: NextRequest) {
           url: targetUrl,
           method,
         })
+
+        console.log(
+          `[proxy] Post-processed: conversationId=${postProcessed.conversationId}, sessionId=${postProcessed.sessionId}, model=${postProcessed.requestModel || 'none'}`
+        )
 
         // Store in database with new fields
         const saved = await prisma.response.create({
@@ -256,18 +280,18 @@ export async function handleProxy(request: NextRequest) {
             durationMs,
           },
         })
-        try {
-          console.log(
-            '[save] response saved:',
-            saved.id,
-            '| pricing:',
-            postProcessed.pricing
-              ? JSON.stringify(postProcessed.pricing)
-              : 'none',
-            '| usage:',
-            postProcessed.usage ? 'present' : 'none'
-          )
-        } catch {}
+        console.log(
+          '[save] response saved:',
+          saved.id,
+          '| pricing:',
+          postProcessed.pricing
+            ? JSON.stringify(postProcessed.pricing)
+            : 'none',
+          '| usage:',
+          postProcessed.usage ? 'present' : 'none',
+          '| duration:',
+          durationMs + 'ms'
+        )
       }
     )
 
@@ -283,7 +307,10 @@ export async function handleProxy(request: NextRequest) {
       headers: responseHeaders,
     })
   } catch (error) {
-    console.error('Proxy error:', error)
+    console.error('[proxy] ERROR:', error)
+    if (error instanceof Error) {
+      console.error('[proxy] Error stack:', error.stack)
+    }
     return NextResponse.json(
       {
         error: 'Internal server error',

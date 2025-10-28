@@ -352,11 +352,6 @@ export default function LlmCallsTable() {
     return num.toLocaleString('en-US')
   }
 
-  const formatPrice = (price: number | null | undefined) => {
-    if (price == null) return '-'
-    return `$${price.toFixed(2)}`
-  }
-
   const formatDuration = (ms: number | null | undefined) => {
     if (ms == null) return '-'
     if (ms < 1000) return `${ms}ms`

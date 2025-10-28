@@ -53,7 +53,7 @@ function hash(str: string) {
 export function extractConversationIdAndSessionId(
   headers: any,
   requestJson: any,
-  responseJson
+  _responseJson: any
 ): {
   conversationId?: string
   sessionId?: string

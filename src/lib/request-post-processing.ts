@@ -116,8 +116,11 @@ export async function postProcessResponse(
   } catch (error) {
     console.warn('Failed to extract model information:', error)
   }
-  const { conversationId, sessionId, userId } =
-    extractConversationIdAndSessionId(requestHeaders, requestJson, responseJson)
+  const { conversationId, sessionId } = extractConversationIdAndSessionId(
+    requestHeaders,
+    requestJson,
+    responseJson
+  )
 
   return {
     provider,

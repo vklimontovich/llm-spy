@@ -133,25 +133,65 @@ export async function decompressResponse(
 ): Promise<Buffer> {
   const buffer = Buffer.from(responseBody)
 
+  console.log(
+    `[decompress] contentEncoding: ${contentEncoding}, buffer size: ${buffer.length} bytes`
+  )
+
   if (!contentEncoding) {
+    console.log('[decompress] No content encoding, returning buffer as-is')
     return buffer
   }
 
+  // Log first 16 bytes in hex to help diagnose issues
+  const hexPreview = buffer
+    .subarray(0, Math.min(16, buffer.length))
+    .toString('hex')
+  console.log(`[decompress] Buffer preview (hex): ${hexPreview}`)
+
   try {
-    switch (contentEncoding.toLowerCase()) {
+    const encoding = contentEncoding.toLowerCase()
+    console.log(`[decompress] Attempting to decompress as ${encoding}`)
+
+    let decompressed: Buffer
+    switch (encoding) {
       case 'gzip':
-        return await gunzipAsync(buffer)
+        // Gzip magic number should be 1f 8b
+        if (buffer.length >= 2 && buffer[0] === 0x1f && buffer[1] === 0x8b) {
+          console.log('[decompress] Valid gzip header detected')
+        } else {
+          console.warn(
+            `[decompress] WARNING: gzip encoding specified but buffer doesn't have gzip magic number (expected 1f 8b, got ${buffer.subarray(0, 2).toString('hex')})`
+          )
+        }
+        decompressed = await gunzipAsync(buffer)
+        break
       case 'deflate':
-        return await inflateAsync(buffer)
+        decompressed = await inflateAsync(buffer)
+        break
       case 'br':
       case 'brotli':
-        return await brotliDecompressAsync(buffer)
+        decompressed = await brotliDecompressAsync(buffer)
+        break
       default:
-        console.warn(`Unknown compression format: ${contentEncoding}`)
+        console.warn(
+          `[decompress] Unknown compression format: ${contentEncoding}`
+        )
         return buffer
     }
+
+    console.log(
+      `[decompress] Successfully decompressed ${buffer.length} bytes to ${decompressed.length} bytes`
+    )
+    return decompressed
   } catch (error) {
-    console.error(`Failed to decompress ${contentEncoding}:`, error)
+    console.error(
+      `[decompress] FAILED to decompress ${contentEncoding}:`,
+      error,
+      `| buffer size: ${buffer.length} bytes`
+    )
+    console.error(
+      `[decompress] Returning original buffer despite decompression failure`
+    )
     return buffer
   }
 }
@@ -302,30 +342,39 @@ export async function captureResponseBody(
         offset += chunk.length
       }
 
-      console.log(`Body size: ${totalSize} bytes`)
-
-      // Limit response body logging to prevent huge logs
-      const responseText = Buffer.from(capturedBody).toString('utf-8')
-      const maskedResponse = maskSensitiveData(responseText)
-      if (maskedResponse.length > 2000) {
-        console.log(
-          `Response Body (truncated):\n`,
-          maskedResponse.substring(0, 2000) + '...'
-        )
-      } else {
-        console.log(`Response Body:\n`, maskedResponse)
-      }
+      console.log(
+        `[capture] Response body captured: ${totalSize} bytes, chunks: ${capturedChunks.length}`
+      )
 
       // Get content encoding and decompress if needed
       const contentEncoding = response.headers.get('content-encoding')
+      console.log(
+        `[capture] Response content-encoding: ${contentEncoding || 'none'}`
+      )
+
       const decompressedBody = await decompressResponse(
         capturedBody.buffer,
         contentEncoding
       )
+      console.log(
+        `[capture] Decompressed response body size: ${decompressedBody.length} bytes`
+      )
+
+      // Limit response body logging to prevent huge logs
+      const responseText = decompressedBody.toString('utf-8')
+      const maskedResponse = maskSensitiveData(responseText)
+      if (maskedResponse.length > 2000) {
+        console.log(
+          `[capture] Response Body (truncated):\n`,
+          maskedResponse.substring(0, 2000) + '...'
+        )
+      } else {
+        console.log(`[capture] Response Body:\n`, maskedResponse)
+      }
 
       await onCapture(decompressedBody, responseHeaders)
     } catch (error) {
-      console.error('Error capturing response:', error)
+      console.error('[capture] Error capturing response:', error)
     }
   })()
 
