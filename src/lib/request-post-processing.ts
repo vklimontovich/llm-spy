@@ -10,6 +10,8 @@ export interface PostProcessingInput {
   requestHeaders: Record<string, string>
   responseHeaders: Record<string, string>
   provider?: string | null
+  url?: string
+  method?: string
 }
 
 export interface PostProcessingResult {
@@ -36,6 +38,8 @@ export async function postProcessResponse(
     requestHeaders,
     responseHeaders,
     provider: initialProvider,
+    url,
+    method,
   } = input
 
   let provider = initialProvider || null
@@ -71,10 +75,12 @@ export async function postProcessResponse(
           }
         }
 
-        const conversationModel = parser.createConversation(
-          requestJson,
-          responseJson
-        )
+        const conversationModel = parser.createConversation({
+          request: requestJson,
+          response: responseJson,
+          url,
+          method,
+        })
         if (conversationModel) {
           requestModel = conversationModel.models.request
           responseModel = conversationModel.models.response

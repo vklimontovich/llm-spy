@@ -223,6 +223,8 @@ export async function handleProxy(request: NextRequest) {
           requestHeaders,
           responseHeaders,
           provider: initialProvider,
+          url: targetUrl,
+          method,
         })
 
         // Store in database with new fields
@@ -231,6 +233,8 @@ export async function handleProxy(request: NextRequest) {
             url: targetUrl,
             method,
             status: response.status,
+            requestUrl: targetUrl,
+            requestMethod: method,
             requestBody: decompressedRequestBody,
             responseBody: decompressedResponseBody,
             requestHeaders: upstream.keepAuthHeaders

@@ -20,14 +20,30 @@ export const requestsRouter = router({
         cursor: z.string().optional(),
         limit: z.number().min(1).max(100).default(20),
         filter: FiltersSchema.optional(),
+        timeRange: z.tuple([z.string(), z.string()]).optional(),
+        timeRangePreset: z
+          .enum([
+            'last15m',
+            'last1h',
+            'last4h',
+            'last1d',
+            'last2d',
+            'last3d',
+            'last1w',
+            'last15d',
+            'last1m',
+          ])
+          .optional(),
       })
     )
     .query(async ({ ctx, input }) => {
-      const responses = await selectLlmCalls({
+      const { items: responses, aggregate } = await selectLlmCalls({
         workspaceId: ctx.workspace.id,
         cursor: input.cursor,
         limit: input.limit + 1,
         filters: input.filter || { fieldFilters: [] },
+        timeRange: input.timeRange,
+        timeRangePreset: input.timeRangePreset,
       })
 
       const hasNextPage = responses.length > input.limit
@@ -47,6 +63,7 @@ export const requestsRouter = router({
         items: processedItems,
         nextCursor,
         hasNextPage,
+        aggregate,
       }
     }),
 
@@ -168,10 +185,12 @@ export const requestsRouter = router({
       let conversationNotAvailableReason: string | undefined = undefined
       let conversation
       try {
-        conversation = provider.createConversation(
-          rawRequestBody,
-          rawResponseJson
-        )
+        conversation = provider.createConversation({
+          request: rawRequestBody,
+          response: rawResponseJson,
+          url: response.requestUrl || response.url,
+          method: response.requestMethod || response.method,
+        })
       } catch (error) {
         console.error('Error creating conversation model:', error)
         conversationNotAvailableReason = `Error creating conversation model: ${(error as Error).message}`

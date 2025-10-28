@@ -7,7 +7,7 @@ export const LlmCallSchema = z.object({
   status: z.number(),
   requestBodySize: z.number(),
   responseBodySize: z.number(),
-  responseContentType: z.string(),
+  responseContentType: z.string().optional(),
   requestHeaders: z.record(z.any()),
   responseHeaders: z.record(z.any()),
   conversationId: z.string().nullable().optional(),
@@ -22,6 +22,12 @@ export const LlmCallSchema = z.object({
   // Pricing shape is intentionally untyped (any), as requested
   pricing: z.any().nullable().optional(),
   durationMs: z.number().nullable().optional(),
+  // Calculated token fields from SQL
+  inputTokens: z.number().nullable().optional(),
+  outputTokens: z.number().nullable().optional(),
+  cacheReadTokens: z.number().nullable().optional(),
+  cacheWriteTokens: z.number().nullable().optional(),
+  // Calculated price from SQL
   price: z.number().nullable().optional(),
 })
 

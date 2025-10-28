@@ -4,6 +4,7 @@ import type {
   ConversationModel,
   ProviderParser,
   Usage,
+  UsagePaths,
 } from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
@@ -542,15 +543,17 @@ export class OpenAIResponsesParser implements ProviderParser {
     return 'openai-responses'
   }
 
-  createConversation(
-    payloadUnknown: unknown | null,
-    responseUnknown?: unknown
-  ): ConversationModel | undefined {
-    if (payloadUnknown === null && responseUnknown) {
+  createConversation(params: {
+    request: unknown
+    response?: unknown
+    url?: string
+    method?: string
+  }): ConversationModel | undefined {
+    if (params.request === null && params.response) {
       // When payload is null, create minimal conversation from response only
-      return this.responseToModel(responseUnknown)
+      return this.responseToModel(params.response)
     }
-    return openaiToModel(payloadUnknown, responseUnknown)
+    return openaiToModel(params.request, params.response)
   }
 
   private responseToModel(responseUnknown: unknown): ConversationModel {
@@ -818,6 +821,16 @@ export class OpenAIResponsesParser implements ProviderParser {
       inputTokens,
       outputTokens,
       cacheReadTokens: cacheReadTokens > 0 ? cacheReadTokens : undefined,
+    }
+  }
+
+  getUsagePaths(): UsagePaths | null {
+    return {
+      // OpenAI supports both newer (input_tokens/output_tokens) and older (prompt_tokens/completion_tokens) formats
+      // Primary paths use the newer format
+      inputTokens: ['usage', 'input_tokens'],
+      outputTokens: ['usage', 'output_tokens'],
+      cacheReadTokens: ['usage', 'cached_tokens'],
     }
   }
 }

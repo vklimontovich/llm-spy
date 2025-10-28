@@ -104,6 +104,8 @@ model Response {
   url             String
   method          String
   status          Int        @default(200)
+  requestUrl      String?
+  requestMethod   String?
   requestBody     Bytes?
   responseBody    Bytes?
   requestHeaders  Json

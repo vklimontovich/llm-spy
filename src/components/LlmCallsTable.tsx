@@ -5,13 +5,19 @@ import { Table, Button, Tooltip, Input } from 'antd'
 import type { ColumnsType } from 'antd/es/table'
 import { useEffect, useState } from 'react'
 import { RefreshCw, User, Bot, Database } from 'lucide-react'
+import type { Dayjs } from 'dayjs'
+import dayjs from 'dayjs'
+import utc from 'dayjs/plugin/utc'
 import styles from '@/app/(protected)/[workspace]/requests/page.module.css'
 import RequestDetails from '@/components/RequestDetails'
 import GettingStarted from '@/components/GettingStarted'
+import TimeRangePicker from '@/components/TimeRangePicker'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useWorkspace } from '@/contexts/WorkspaceContext'
 import { LlmCall, Filter, Filters } from '@/schemas/requests'
 import { useWorkspaceTrpc } from '@/lib/trpc'
+
+dayjs.extend(utc)
 
 const PAGE_SIZE = 100
 
@@ -92,6 +98,9 @@ export default function LlmCallsTable() {
   const [allRequests, setAllRequests] = useState<LlmCall[]>([])
   const [filters, setFilters] = useState<Filters>({ fieldFilters: [] })
   const [searchText, setSearchText] = useState('')
+  const [total, setTotal] = useState<number>(0)
+  const [timeRangePreset, setTimeRangePreset] = useState<string>('last1h')
+  const [timeRange, setTimeRange] = useState<[Dayjs, Dayjs] | null>(null)
 
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -100,7 +109,7 @@ export default function LlmCallsTable() {
   const trpc = useWorkspaceTrpc()
   const [cursor, setCursor] = useState<string | undefined>(undefined)
 
-  // Load filters from URL on mount
+  // Load filters and time range from URL on mount
   useEffect(() => {
     const filterParam = searchParams.get('filter')
     if (filterParam) {
@@ -119,26 +128,68 @@ export default function LlmCallsTable() {
         // Ignore invalid filter params
       }
     }
+
+    // Load time range preset from URL
+    const presetParam = searchParams.get('timePreset')
+    if (presetParam) {
+      setTimeRangePreset(presetParam)
+    }
+
+    // Load time range from URL
+    const rangeParam = searchParams.get('timeRange')
+    if (rangeParam) {
+      try {
+        const parsed = JSON.parse(rangeParam)
+        if (Array.isArray(parsed) && parsed.length === 2) {
+          setTimeRange([dayjs(parsed[0]), dayjs(parsed[1])])
+        }
+      } catch {
+        // Ignore invalid time range params
+      }
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []) // Only run on mount
 
   const { data, isLoading, error, isFetching } = useQuery({
-    queryKey: ['requests', cursor, filters],
-    queryFn: () =>
-      trpc.requests.list.query({
+    queryKey: ['requests', cursor, filters, timeRangePreset, timeRange],
+    queryFn: () => {
+      const params: any = {
         cursor,
         limit: PAGE_SIZE,
         filter:
           filters.fieldFilters.length > 0 || filters.fullText
             ? filters
             : undefined,
-      }),
+      }
+
+      // Add time range params
+      if (timeRange) {
+        params.timeRange = [
+          timeRange[0].toISOString(),
+          timeRange[1].toISOString(),
+        ]
+      }
+      if (timeRangePreset && timeRangePreset !== 'custom') {
+        params.timeRangePreset = timeRangePreset
+      }
+
+      return trpc.requests.list.query(params)
+    },
   })
 
   // Let the error boundary above catch errors
   if (error) {
     throw error
   }
+
+  // Set default time range based on first event
+  useEffect(() => {
+    if (data?.items && data.items.length > 0 && !timeRange) {
+      const latestEventTime = dayjs.utc(data.items[0].createdAt)
+      const startTime = latestEventTime.subtract(1, 'hour')
+      setTimeRange([startTime, latestEventTime])
+    }
+  }, [data, timeRange])
 
   // Merge pages
   useEffect(() => {
@@ -149,6 +200,9 @@ export default function LlmCallsTable() {
         setAllRequests(prev => [...prev, ...data.items])
       }
       setHasMore(data.hasNextPage)
+      if (data.aggregate?.totalCalls !== undefined) {
+        setTotal(data.aggregate.totalCalls)
+      }
     }
   }, [data, cursor])
 
@@ -255,6 +309,36 @@ export default function LlmCallsTable() {
     setLoadingMore(false)
   }
 
+  const handleTimeRangeChange = (
+    dates: [Dayjs, Dayjs] | null,
+    preset: string
+  ) => {
+    setTimeRange(dates)
+    setTimeRangePreset(preset)
+    setCursor(undefined)
+    setHasMore(true)
+
+    // Update URL with time range params
+    const params = new URLSearchParams(searchParams.toString())
+    if (preset) {
+      params.set('timePreset', preset)
+    } else {
+      params.delete('timePreset')
+    }
+    if (dates) {
+      params.set(
+        'timeRange',
+        JSON.stringify([dates[0].toISOString(), dates[1].toISOString()])
+      )
+    } else {
+      params.delete('timeRange')
+    }
+    const newUrl = params.toString()
+      ? `/${workspace.slug}/requests?${params.toString()}`
+      : `/${workspace.slug}/requests`
+    router.push(newUrl, { scroll: false })
+  }
+
   const formatBytes = (bytes: number) => {
     if (bytes === 0) return '0'
     const k = 1024
@@ -279,20 +363,16 @@ export default function LlmCallsTable() {
     return `${(ms / 1000).toFixed(2)}s`
   }
 
-  const getOutputTokens = (usage: any | null | undefined) => {
-    if (!usage) return 0
-    return Number(usage.output_tokens || 0)
+  const getOutputTokens = (record: LlmCall) => {
+    return Number(record.outputTokens || 0)
   }
 
-  const getCachedTokens = (usage: any | null | undefined) => {
-    if (!usage) return 0
-    const read = Number(usage.cache_read_input_tokens || 0)
-    const flatCreate = Number(usage.cache_creation_input_tokens || 0)
-    const nestedCreate =
-      Number(usage.cache_creation?.ephemeral_1h_input_tokens || 0) +
-      Number(usage.cache_creation?.ephemeral_5m_input_tokens || 0)
-    const create = flatCreate || nestedCreate
-    return read + create
+  const getCachedInputTokens = (record: LlmCall) => {
+    return Number(record.cacheReadTokens || 0)
+  }
+
+  const getCachedOutputTokens = (record: LlmCall) => {
+    return Number(record.cacheWriteTokens || 0)
   }
 
   const formatDate = (dateString: string) => {
@@ -501,12 +581,12 @@ export default function LlmCallsTable() {
       align: 'right',
       fixed: 'right',
       render: (_, record) => {
-        const base = Number(record.usage?.input_tokens || 0)
-        const cached = getCachedTokens(record.usage)
+        const base = Number(record.inputTokens || 0)
+        const cached = getCachedInputTokens(record)
         return (
           <span
             className="text-xs font-mono"
-            title="Prompt/input token count for this call (base; cached read+create)"
+            title="Prompt/input token count for this call (base; cached read)"
           >
             {formatNumber(base)}
             <br />
@@ -527,14 +607,22 @@ export default function LlmCallsTable() {
       width: 70,
       align: 'right',
       fixed: 'right',
-      render: (_, record) => (
-        <span
-          className="text-xs font-mono"
-          title="Completion/output token count for this call"
-        >
-          {formatNumber(getOutputTokens(record.usage))}
-        </span>
-      ),
+      render: (_, record) => {
+        const base = getOutputTokens(record)
+        const cached = getCachedOutputTokens(record)
+        return (
+          <span
+            className="text-xs font-mono"
+            title="Completion/output token count for this call (base; cached write)"
+          >
+            {formatNumber(base)}
+            <br />
+            <span className="whitespace-nowrap text-xs text-gray-500">
+              {cached > 0 ? ` (+${formatNumber(cached)} cached)` : ''}
+            </span>
+          </span>
+        )
+      },
     },
     {
       title: <span className="whitespace-nowrap">Price</span>,
@@ -542,9 +630,17 @@ export default function LlmCallsTable() {
       width: 80,
       align: 'right',
       fixed: 'right',
-      render: (_, record) => (
-        <span className="text-xs font-mono">{formatPrice(record.price)}</span>
-      ),
+      render: (_, record) => {
+        if (record.price == null) {
+          return <span className="text-xs font-mono">-</span>
+        }
+        const price = Number(record.price)
+        return (
+          <Tooltip title={`$${price.toFixed(5)}`}>
+            <span className="text-xs font-mono">${price.toFixed(2)}</span>
+          </Tooltip>
+        )
+      },
     },
     {
       title: <span className="whitespace-nowrap">Duration</span>,
@@ -586,30 +682,112 @@ export default function LlmCallsTable() {
   return (
     <div className="min-h-screen">
       <div className="p-6">
-        <div className="flex items-center justify-between mb-2">
-          <div>
-            <h1 className="text-2xl font-bold">LLM Calls</h1>
-            <p className="text-gray-600">View all captured LLM Calls</p>
+        <div className="mb-2">
+          <div className="flex items-center justify-between mb-0">
+            <div>
+              <h1 className="text-2xl font-bold">LLM Calls</h1>
+              <p className="text-gray-600">View all captured LLM Calls</p>
+            </div>
+            <div className="flex items-center gap-4">
+              {/* Aggregate Stats Display */}
+              {data?.aggregate && (
+                <div className="flex items-start gap-3 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg">
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-gray-500 text-right">
+                      Calls
+                    </span>
+                    <span className="text-sm font-semibold text-gray-900">
+                      {formatNumber(data.aggregate.totalCalls)}
+                    </span>
+                  </div>
+                  <div className="h-full w-px bg-gray-300" />
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-gray-500 leading-tight text-right">
+                      In Tokens
+                      <br />
+                      (excl Cached)
+                    </span>
+                    <span className="text-sm font-semibold text-green-600">
+                      {formatNumber(data.aggregate.totalInputTokens)}
+                    </span>
+                  </div>
+                  {(data.aggregate.totalCacheReadTokens > 0 ||
+                    data.aggregate.totalCacheWriteTokens > 0) && (
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-gray-500 leading-tight text-right">
+                        In Tokens
+                        <br />
+                        (Cached)
+                      </span>
+                      <span className="text-sm font-semibold text-green-600">
+                        {formatNumber(data.aggregate.totalCacheReadTokens)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-gray-500 leading-tight text-right">
+                      Out Tokens
+                      <br />
+                      (excl Cached)
+                    </span>
+                    <span className="text-sm font-semibold text-orange-600">
+                      {formatNumber(data.aggregate.totalOutputTokens)}
+                    </span>
+                  </div>
+                  {(data.aggregate.totalCacheReadTokens > 0 ||
+                    data.aggregate.totalCacheWriteTokens > 0) && (
+                    <div className="flex flex-col items-end">
+                      <span className="text-xs text-gray-500 leading-tight text-right">
+                        Out Tokens
+                        <br />
+                        (Cached)
+                      </span>
+                      <span className="text-sm font-semibold text-orange-600">
+                        {formatNumber(data.aggregate.totalCacheWriteTokens)}
+                      </span>
+                    </div>
+                  )}
+                  <div className="h-full w-px bg-gray-300" />
+                  <div className="flex flex-col items-end">
+                    <span className="text-xs text-gray-500 text-right">
+                      Cost
+                    </span>
+                    <span className="text-sm font-bold text-gray-900">
+                      ${data.aggregate.totalPrice.toFixed(2)}
+                    </span>
+                  </div>
+                </div>
+              )}
+              <TimeRangePicker
+                rangeValue={timeRange}
+                presetValue={timeRangePreset}
+                defaultPresetInterval="last1h"
+                onChange={handleTimeRangeChange}
+              />
+              <Input.Search
+                placeholder="Search in requests and responses..."
+                allowClear
+                value={searchText}
+                onChange={e => setSearchText(e.target.value)}
+                onSearch={handleSearch}
+                style={{ width: 300 }}
+                size="large"
+              />
+              <Button
+                icon={<RefreshCw className="w-4 h-4" />}
+                onClick={handleRefresh}
+                loading={isFetching}
+                size="large"
+              >
+                Refresh
+              </Button>
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <Input.Search
-              placeholder="Search in requests and responses..."
-              allowClear
-              value={searchText}
-              onChange={e => setSearchText(e.target.value)}
-              onSearch={handleSearch}
-              style={{ width: 300 }}
-              size="large"
-            />
-            <Button
-              icon={<RefreshCw className="w-4 h-4" />}
-              onClick={handleRefresh}
-              loading={isFetching}
-              size="large"
-            >
-              Refresh
-            </Button>
-          </div>
+          {total > 0 && (
+            <div className="text-xs text-gray-500 text-right">
+              showing {allRequests.length} out of {total} events matching filter
+            </div>
+          )}
         </div>
         <FilterDisplay
           filters={filters}
@@ -672,6 +850,13 @@ export default function LlmCallsTable() {
               >
                 Load More
               </Button>
+              {total > 0 && (
+                <div className="text-xs text-gray-500 mt-2">
+                  showing {allRequests.length} out of {total} events matching
+                  filter, load {Math.min(PAGE_SIZE, total - allRequests.length)}{' '}
+                  more
+                </div>
+              )}
             </div>
           )}
         </div>

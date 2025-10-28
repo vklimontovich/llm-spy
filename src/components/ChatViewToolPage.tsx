@@ -90,7 +90,9 @@ export default function ChatViewToolPage({
       try {
         // Use startTransition for non-urgent updates
         startTransition(() => {
-          const conversation = parser.createConversation(parsed)
+          const conversation = parser.createConversation({
+            request: parsed,
+          })
           console.log('Conversation:', conversation)
 
           if (conversation) {

@@ -46,3 +46,7 @@
   - After creating new files, run `git add <file>` to stage them
   - For moving files, use `git mv <source> <destination>` instead of regular `mv`
   - For removing files, use `git rm <file>` instead of regular `rm`
+
+## CSS Styles
+
+Use tailwind CSS, use style={{}} only in exceptional cases. Also CSS modiles are fine

@@ -8,7 +8,7 @@ export const conversationsRouter = router({
    */
   list: workspaceProcedure.query(async ({ ctx }) => {
     // Fetch all LLM calls for the workspace
-    const responses = await selectLlmCalls({
+    const { items: responses } = await selectLlmCalls({
       workspaceId: ctx.workspace.id,
       limit: 10000, // High limit to get all conversations
     })

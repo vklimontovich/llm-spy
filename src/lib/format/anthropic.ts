@@ -4,6 +4,7 @@ import type {
   ConversationModel,
   ProviderParser,
   Usage,
+  UsagePaths,
 } from '@/lib/format/model'
 import type { SSEEvent } from '@/lib/sse-utils'
 
@@ -454,15 +455,17 @@ export class AnthropicParser implements ProviderParser {
     return 'anthropic'
   }
 
-  createConversation(
-    payloadUnknown: unknown | null,
-    responseUnknown?: unknown
-  ): ConversationModel | undefined {
-    if (payloadUnknown === null && responseUnknown) {
+  createConversation(params: {
+    request: unknown
+    response?: unknown
+    url?: string
+    method?: string
+  }): ConversationModel | undefined {
+    if (params.request === null && params.response) {
       // When payload is null, create minimal conversation from response only
-      return this.responseToModel(responseUnknown)
+      return this.responseToModel(params.response)
     }
-    return anthropicToModel(payloadUnknown, responseUnknown)
+    return anthropicToModel(params.request, params.response)
   }
 
   private responseToModel(responseUnknown: unknown): ConversationModel {
@@ -657,6 +660,19 @@ export class AnthropicParser implements ProviderParser {
       outputTokens,
       cacheReadTokens: cacheReadTokens > 0 ? cacheReadTokens : undefined,
       cacheWriteTokens: cacheWriteTokens > 0 ? cacheWriteTokens : undefined,
+    }
+  }
+
+  getUsagePaths(): UsagePaths | null {
+    return {
+      inputTokens: ['usage', 'input_tokens'],
+      outputTokens: ['usage', 'output_tokens'],
+      cacheReadTokens: ['usage', 'cache_read_input_tokens'],
+      // Note: cache_creation_input_tokens is the flat format
+      // Nested format is usage.cache_creation.ephemeral_1h_input_tokens
+      // and usage.cache_creation.ephemeral_5m_input_tokens
+      // Returning the flat format path as primary
+      cacheWriteTokens: ['usage', 'cache_creation_input_tokens'],
     }
   }
 }
